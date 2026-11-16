@@ -12,3 +12,5 @@ process.env.RATE_LIMIT_REFRESH_PER_MINUTE = "10000";
 process.env.TRUST_PROXY = "false";
 delete process.env.APP_URL;
 process.env.CORS_ORIGIN = "http://localhost:5173";
+// เทสต์ใช้ตัวนับในหน่วยความจำเสมอ (Redis ทดสอบแยกด้วย fetch ปลอมใน unit.test.ts)
+for (const key of ["VERCEL", "UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN", "KV_REST_API_URL", "KV_REST_API_TOKEN"]) delete process.env[key];

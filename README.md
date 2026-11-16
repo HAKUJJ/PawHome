@@ -94,7 +94,7 @@ npm run dev                # http://localhost:5173
 | ไฟล์ | ตัวแปร | หมายเหตุ |
 |---|---|---|
 | `frontend/.env` | `VITE_API_URL` | ลิงก์ Backend รวม `/api` |
-| | `VITE_USE_MOCK` | `true` = ใช้ข้อมูลจำลองในเบราว์เซอร์ ไม่ต้องมี Backend |
+| | `VITE_USE_MOCK` | `true` = ใช้ข้อมูลจำลองในเบราว์เซอร์ ไม่ต้องมี Backend · ไม่ใช่ `true` และไม่มี `VITE_API_URL` = แสดงหน้าแจ้งว่าตั้งค่าไม่ครบ (ไม่แอบใช้ข้อมูลจำลอง) |
 | `backend/.env` | `PORT` | ค่าเริ่มต้น 3000 |
 | | `CORS_ORIGIN` | โดเมนหน้าเว็บ คั่นด้วย `,` |
 | | `DATABASE_URL` | 🔒 connection string (Session pooler) |
@@ -104,6 +104,7 @@ npm run dev                # http://localhost:5173
 | | `APP_URL` | หน้าเว็บที่ลิงก์ยืนยันอีเมลพากลับมา (ค่าเริ่มต้น = โดเมนแรกของ `CORS_ORIGIN`) |
 | | `TRUST_PROXY` | `false` (ค่าเริ่มต้น) = ไม่เชื่อ `X-Forwarded-For` · อยู่หลัง proxy ใส่จำนวน proxy เช่น `1` |
 | | `RATE_LIMIT_LOGIN_PER_MINUTE` / `_REGISTER_` / `_REFRESH_` | ต่อ IP ต่อนาที ค่าเริ่มต้น 10 / 10 / 30 |
+| | `UPSTASH_REDIS_REST_URL` / `_TOKEN` 🔒 | ตัวนับ rate limit ร่วมกันทุก instance (หรือ `KV_REST_API_URL` / `_TOKEN` จาก Vercel Marketplace) · บังคับบน Vercel · เครื่อง dev เว้นว่าง = นับในหน่วยความจำ |
 
 ไฟล์ `.env` ทั้งหมดอยู่ใน `.gitignore` — commit เฉพาะ `.env.example`
 
@@ -128,9 +129,11 @@ cd backend && npm run smoke:live   # ทดสอบทุก endpoint กับ
 
 ## Deploy
 
-- Frontend (Vercel): Root Directory = `frontend` · ตั้ง `VITE_API_URL` เป็นลิงก์ Backend จริง
-- Backend: เครื่องที่รัน Node 22 ได้ (Render, Railway, Fly ฯลฯ) · `npm run build && npm start` · ตั้ง `CORS_ORIGIN` และ `APP_URL` เป็นโดเมนของหน้าเว็บ · ตั้ง `TRUST_PROXY=1` (แพลตฟอร์มเหล่านี้มี proxy ข้างหน้า 1 ชั้น ไม่งั้นผู้ใช้ทุกคนได้ IP เดียวกันและโดน rate limit รวมกัน)
-- Supabase: เพิ่มโดเมนจริงใน Redirect URLs และตั้ง Custom SMTP ก่อนเปิดให้สมัครจริง
+ทั้งสองฝั่งบน Vercel (2 Projects จาก repo เดียว) — ขั้นตอนเต็ม + Environment Variables แยกตาม Project: [docs/deploy-vercel.md](docs/deploy-vercel.md)
+
+- `pawhome-api`: Root Directory = `backend` · Framework = Express (ใช้ `export default app` ใน `src/app.ts`) · `DATABASE_URL` ใช้ Transaction pooler + `?pgbouncer=true&connection_limit=1` · ต้องมี Upstash Redis สำหรับ rate limit · `TRUST_PROXY=1`
+- `pawhome-web`: Root Directory = `frontend` · Framework = Vite · `VITE_API_URL=https://<api-domain>/api` · `VITE_USE_MOCK=false`
+- Supabase: Site URL + Redirect URLs เป็นโดเมนจริงของหน้าเว็บ และตั้ง Custom SMTP ก่อนเปิดให้สมัครจริง
 
 ## Known Issues
 

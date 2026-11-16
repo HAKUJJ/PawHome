@@ -12,7 +12,7 @@
 | Client State | Zustand v5 (`useAuthStore` persist ลง localStorage key `pawhome-auth`, `useFilterStore`, `useToastStore`) |
 | Styling | Tailwind CSS v4 (`@theme` ใน `src/index.css`) + Google Fonts (IBM Plex Sans Thai, Prompt, Sriracha) |
 | API layer | `src/api/client.ts` → `fetch(VITE_API_URL + path)` แนบ `Authorization: Bearer <token>` · error อ่านจาก `{ message }` · 401 แล้วล็อกเอาต์อัตโนมัติ |
-| Mock | `src/api/mockPets.ts` ใช้เมื่อ `VITE_USE_MOCK=true` หรือไม่มี `VITE_API_URL` — ทุกฟังก์ชันใน `src/api/*.ts` สลับ mock/จริงด้วย `USE_MOCK` |
+| Mock | `src/api/mockPets.ts` ใช้เฉพาะเมื่อ `VITE_USE_MOCK=true` (ไม่มี `VITE_API_URL` = แสดงหน้าแจ้งตั้งค่าไม่ครบ ไม่ fallback เป็น mock) — ทุกฟังก์ชันใน `src/api/*.ts` สลับ mock/จริงด้วย `USE_MOCK` |
 | Deploy | `vercel.json` rewrite ทุก path → `index.html` |
 | Backend เดิม | **ไม่มี** มีแต่สัญญา API ใน README และคอมเมนต์ใน `src/api/*.ts` |
 | Supabase เดิม | **ไม่มี** ทั้งโค้ดและ migration (`.mcp.json` เพิ่งเพิ่ม ยังไม่ได้เชื่อมต่อในเซสชันนี้) |

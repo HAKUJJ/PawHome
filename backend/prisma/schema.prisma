@@ -3,7 +3,9 @@
 // แก้ตาราง: แก้ SQL ก่อน แล้วค่อยแก้ไฟล์นี้ให้ตรงกัน
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // native = เครื่องที่ build · rhel-openssl-3.0.x = Vercel Functions (Amazon Linux 2023)
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {

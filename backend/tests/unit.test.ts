@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { supabaseUrlSchema } from "../src/config/env.js";
+import { upstashStore } from "../src/middleware/rate-limit.js";
 import { derivePetStatus } from "../src/services/adoptions.service.js";
 import { detectImageType } from "../src/services/uploads.service.js";
 import { adoptionInputSchema } from "../src/validators/adoptions.validator.js";
@@ -95,5 +96,27 @@ describe("validators", () => {
     const input = { phone: "081-234 5678", housing: "HOUSE", message: "บ้านมีสนามหญ้า มีคนอยู่บ้านตลอดทั้งวัน" };
     expect(adoptionInputSchema.parse(input).phone).toBe("0812345678");
     expect(adoptionInputSchema.safeParse({ ...input, phone: "1234567890" }).success).toBe(false);
+  });
+});
+
+describe("upstashStore (shared rate-limit counter)", () => {
+  it("sends INCR + PEXPIRE to /pipeline and returns the window count", async () => {
+    const sent: { url: string; auth: string | null; body: unknown }[] = [];
+    const fakeFetch = (async (url: string, init: RequestInit) => {
+      sent.push({ url, auth: new Headers(init.headers).get("Authorization"), body: JSON.parse(init.body as string) });
+      return new Response(JSON.stringify([{ result: 4 }, { result: 1 }]), { status: 200 });
+    }) as unknown as typeof fetch;
+    const now = 1_700_000_070_000; // ต้นนาที = 1_700_000_040_000 (หาร 60_000 ลงตัว) + 30 วินาที
+    const hit = await upstashStore("https://redis.example/", "tok", fakeFetch).hit("login:1.2.3.4", now);
+    expect(hit).toEqual({ count: 4, resetAt: 1_700_000_100_000 });
+    expect(sent[0].url).toBe("https://redis.example/pipeline");
+    expect(sent[0].auth).toBe("Bearer tok");
+    const key = "pawhome:rl:login:1.2.3.4:1700000040000";
+    expect(sent[0].body).toEqual([["INCR", key], ["PEXPIRE", key, "120000"]]);
+  });
+
+  it("throws when Redis errors (rateLimit then fails open)", async () => {
+    const fakeFetch = (async () => new Response("nope", { status: 500 })) as unknown as typeof fetch;
+    await expect(upstashStore("https://redis.example", "tok", fakeFetch).hit("k", 0)).rejects.toThrow(/500/);
   });
 });

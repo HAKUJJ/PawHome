@@ -10,10 +10,15 @@
 import { useAuthStore } from "../stores/useAuthStore";
 import type { AuthResponse } from "../types/user";
 
-export const API_URL = import.meta.env.VITE_API_URL ?? "";
+export const API_URL = (import.meta.env.VITE_API_URL ?? "").trim().replace(/\/+$/, "");
 
-// ใช้ข้อมูลจำลองเมื่อยังไม่ได้ตั้ง API_URL หรือสั่ง VITE_USE_MOCK=true
-export const USE_MOCK = !API_URL || import.meta.env.VITE_USE_MOCK === "true";
+// ใช้ข้อมูลจำลองเฉพาะเมื่อสั่ง VITE_USE_MOCK=true ตรง ๆ เท่านั้น
+// (ไม่ fallback เป็นข้อมูลจำลองเงียบ ๆ ตอนลืมตั้ง VITE_API_URL — ผู้ใช้จะเห็นข้อมูลปลอมโดยไม่รู้ตัว)
+export const USE_MOCK = import.meta.env.VITE_USE_MOCK === "true";
+
+// ไม่ใช้ข้อมูลจำลอง แต่ไม่ได้ตั้ง VITE_API_URL → ทุก request โยน error นี้ และ main.tsx แสดงหน้าแจ้งเตือน
+export const CONFIG_ERROR: string | null =
+  !USE_MOCK && !API_URL ? "ยังไม่ได้ตั้งค่า VITE_API_URL (ลิงก์ Backend รวม /api) จึงเชื่อมต่อเซิร์ฟเวอร์ไม่ได้" : null;
 
 // ขอ token ใหม่ก่อนหมดอายุจริง 60 วินาที กันหมดระหว่างทาง
 const REFRESH_EARLY_SECONDS = 60;
@@ -51,6 +56,7 @@ async function doRefresh(staleToken: string | null): Promise<string | null> {
   const { token, expiresAt, refreshToken, logout, setAuth } = useAuthStore.getState();
   if (token && token !== staleToken && !isExpiring(expiresAt)) return token;
   if (!refreshToken) return null;
+  if (CONFIG_ERROR) throw new ApiError(0, CONFIG_ERROR);
 
   const response = await fetch(`${API_URL}/auth/refresh`, {
     method: "POST",
@@ -120,6 +126,7 @@ function messageOf(body: unknown, status: number): string {
 }
 
 function send(path: string, options: RequestInit, token: string | null) {
+  if (CONFIG_ERROR) return Promise.reject(new ApiError(0, CONFIG_ERROR));
   const headers = new Headers(options.headers);
   // ส่งไฟล์ (FormData) ไม่ต้องใส่ Content-Type เอง browser จะใส่ให้พร้อม boundary
   if (options.body && !(options.body instanceof FormData)) headers.set("Content-Type", "application/json");
