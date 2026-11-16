@@ -36,8 +36,21 @@ const trustProxySchema = z
   .transform((v) => (v === "true" ? true : v === "false" ? false : /^\d+$/.test(v) ? Number(v) : v));
 
 const perMinute = (fallback: number) => z.coerce.number().int().positive().default(fallback);
-// ค่าว่างใน .env (เช่น UPSTASH_REDIS_REST_URL=) = ไม่ได้ตั้ง
-const optional = <T extends z.ZodTypeAny>(inner: T) => z.preprocess((v) => (v === "" ? undefined : v), inner.optional());
+
+// ค่าที่วางใน Vercel Dashboard มักติดมาจากไฟล์ .env: ช่องว่าง, เครื่องหมายคำพูดครอบ, คอมเมนต์ท้ายบรรทัด, ค่าว่าง
+// → ล้างก่อนตรวจ (ค่าว่าง = ไม่ได้ตั้ง ใช้ค่าเริ่มต้น) ไม่ให้ Function พังทั้งตัวเพราะ RATE_LIMIT_*="10"
+export function normalizeEnv(source: NodeJS.ProcessEnv): Record<string, string | undefined> {
+  const out: Record<string, string | undefined> = {};
+  for (const [key, raw] of Object.entries(source)) {
+    if (raw === undefined) continue;
+    let value = raw.trim();
+    const quoted = value.match(/^(["'])(.*)\1$/);
+    if (quoted) value = quoted[2].trim();
+    else value = value.replace(/\s+#.*$/, ""); // KEY=10 # คอมเมนต์
+    out[key] = value === "" ? undefined : value;
+  }
+  return out;
+}
 
 const schema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
@@ -53,15 +66,11 @@ const schema = z.object({
   RATE_LIMIT_LOGIN_PER_MINUTE: perMinute(10),
   RATE_LIMIT_REGISTER_PER_MINUTE: perMinute(10),
   RATE_LIMIT_REFRESH_PER_MINUTE: perMinute(30), // refresh เกิดเองอัตโนมัติ ทุกแท็บ ทุกผู้ใช้หลัง NAT เดียวกัน
-  // ตัวนับ rate limit ร่วมกันทุก instance (Upstash Redis REST) — ต่อผ่าน Vercel Marketplace จะได้ชื่อ KV_REST_API_*
-  UPSTASH_REDIS_REST_URL: optional(z.string().url()),
-  UPSTASH_REDIS_REST_TOKEN: optional(z.string()),
-  KV_REST_API_URL: optional(z.string().url()),
-  KV_REST_API_TOKEN: optional(z.string()),
-  VERCEL: optional(z.string()), // Vercel ตั้งให้เองเป็น "1" ทั้งตอน build และตอนรัน
 });
 
-const parsed = schema.safeParse(process.env);
+export const envSchema = schema;
+
+const parsed = schema.safeParse(normalizeEnv(process.env));
 if (!parsed.success) {
   const problems = parsed.error.issues
     .map((i) => (i.code === "custom" ? i.message : `${i.path.join(".")}: ${i.message}`))
@@ -69,19 +78,7 @@ if (!parsed.success) {
   throw new Error(`ตั้งค่า environment ไม่ครบ/ไม่ถูกต้อง: ${problems} (ดู backend/.env.example)`);
 }
 
-const REDIS_REST_URL = parsed.data.UPSTASH_REDIS_REST_URL ?? parsed.data.KV_REST_API_URL;
-const REDIS_REST_TOKEN = parsed.data.UPSTASH_REDIS_REST_TOKEN ?? parsed.data.KV_REST_API_TOKEN;
-
-// Vercel = serverless หลาย instance → ตัวนับในหน่วยความจำกัน brute force ไม่ได้จริง ต้องมี Redis
-if (parsed.data.VERCEL && !(REDIS_REST_URL && REDIS_REST_TOKEN)) {
-  throw new Error(
-    "รันบน Vercel ต้องตั้ง UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN (หรือ KV_REST_API_URL + KV_REST_API_TOKEN) สำหรับ rate limit (ดู backend/.env.example)",
-  );
-}
-
 export const env = {
   ...parsed.data,
   APP_URL: parsed.data.APP_URL ?? parsed.data.CORS_ORIGIN.split(",")[0].trim(),
-  REDIS_REST_URL,
-  REDIS_REST_TOKEN,
 };

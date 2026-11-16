@@ -104,7 +104,6 @@ npm run dev                # http://localhost:5173
 | | `APP_URL` | หน้าเว็บที่ลิงก์ยืนยันอีเมลพากลับมา (ค่าเริ่มต้น = โดเมนแรกของ `CORS_ORIGIN`) |
 | | `TRUST_PROXY` | `false` (ค่าเริ่มต้น) = ไม่เชื่อ `X-Forwarded-For` · อยู่หลัง proxy ใส่จำนวน proxy เช่น `1` |
 | | `RATE_LIMIT_LOGIN_PER_MINUTE` / `_REGISTER_` / `_REFRESH_` | ต่อ IP ต่อนาที ค่าเริ่มต้น 10 / 10 / 30 |
-| | `UPSTASH_REDIS_REST_URL` / `_TOKEN` 🔒 | ตัวนับ rate limit ร่วมกันทุก instance (หรือ `KV_REST_API_URL` / `_TOKEN` จาก Vercel Marketplace) · บังคับบน Vercel · เครื่อง dev เว้นว่าง = นับในหน่วยความจำ |
 
 ไฟล์ `.env` ทั้งหมดอยู่ใน `.gitignore` — commit เฉพาะ `.env.example`
 
@@ -131,7 +130,7 @@ cd backend && npm run smoke:live   # ทดสอบทุก endpoint กับ
 
 ทั้งสองฝั่งบน Vercel (2 Projects จาก repo เดียว) — ขั้นตอนเต็ม + Environment Variables แยกตาม Project: [docs/deploy-vercel.md](docs/deploy-vercel.md)
 
-- `pawhome-api`: Root Directory = `backend` · Framework = Express (ใช้ `export default app` ใน `src/app.ts`) · `DATABASE_URL` ใช้ Transaction pooler + `?pgbouncer=true&connection_limit=1` · ต้องมี Upstash Redis สำหรับ rate limit · `TRUST_PROXY=1`
+- `pawhome-api`: Root Directory = `backend` · Framework = Express (ใช้ `export default app` ใน `src/app.ts`) · `DATABASE_URL` ใช้ Transaction pooler + `?pgbouncer=true&connection_limit=1` · `TRUST_PROXY=1` · ไม่ต้องใช้ Redis
 - `pawhome-web`: Root Directory = `frontend` · Framework = Vite · `VITE_API_URL=https://<api-domain>/api` · `VITE_USE_MOCK=false`
 - Supabase: Site URL + Redirect URLs เป็นโดเมนจริงของหน้าเว็บ และตั้ง Custom SMTP ก่อนเปิดให้สมัครจริง
 
@@ -142,7 +141,7 @@ cd backend && npm run smoke:live   # ทดสอบทุก endpoint กับ
 - โปรเจกต์ยังไม่มี ESLint (มีแค่ TypeScript strict + `noUnusedLocals`)
 - ลบโพสต์หรือเปลี่ยนรูปแล้ว ไฟล์รูปเก่าใน Storage ยังอยู่ (ยังไม่มีงานลบไฟล์ที่ไม่ได้ใช้)
 - ไม่มี pagination (หน้าเว็บแสดง "พบ N ตัว" จากรายการทั้งหมด) — พอสำหรับหลักร้อย-พันโพสต์
-- Rate limit ของ Backend นับในหน่วยความจำของ process เดียว — รัน Backend หลายตัวต้องย้ายตัวนับไปที่ร่วมกัน (เช่น Redis)
+- Rate limit ของ Backend นับในหน่วยความจำของแต่ละ instance (เหมาะกับ Development / Demo) — บน Vercel ตัวนับไม่รวมกันข้าม instance และเริ่มใหม่เมื่อ instance ใหม่ขึ้นมา ให้ใช้ Vercel Firewall Rate Limiting + rate limit ของ Supabase Auth เป็นด่านหลัก
 - บน Windows: `npm run build` ของ backend ต้องปิด `npm run dev` ก่อน (`prisma generate` เขียนทับไฟล์ที่ server กำลังใช้ไม่ได้)
 - ปุ่มบนการ์ดโฆษณาเป็นลิงก์ `#` ตามต้นฉบับ (เนื้อหายังเป็น placeholder)
 - `mock-data.sql` ใส่ id น้อง 1–12 เอง ใช้กับฐานข้อมูล demo ที่ว่างเท่านั้น (มี guard หยุดเองถ้าเจอข้อมูลผู้ใช้จริง)

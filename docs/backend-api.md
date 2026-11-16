@@ -73,7 +73,7 @@ AdoptionRequest { id: number, petId, userId: string(uuid), userName, phone, hous
 
 Backend ตรวจ access token ด้วย `supabase.auth.getUser(token)` ทุก request — Supabase ตรวจลายเซ็น วันหมดอายุ และ session ที่ถูกยกเลิก · หน้าเว็บไม่มี key ของ Supabase เลย
 
-**Rate limit:** นับต่อ IP ต่อนาที แยกตาม endpoint ปรับได้ด้วย `RATE_LIMIT_*` · IP มาจาก `req.ip` ซึ่งเชื่อ `X-Forwarded-For` เฉพาะเมื่อตั้ง `TRUST_PROXY` · ตัวนับเก็บใน Upstash Redis (fixed window 1 นาที) เมื่อตั้งค่าไว้ — บังคับบน Vercel
+**Rate limit:** นับต่อ IP ต่อนาที แยกตาม endpoint ปรับได้ด้วย `RATE_LIMIT_*` · IP มาจาก `req.ip` ซึ่งเชื่อ `X-Forwarded-For` เฉพาะเมื่อตั้ง `TRUST_PROXY` · นับในหน่วยความจำของแต่ละ instance (fixed window 1 นาที)
 
 **ยกเลิก / อนุมัติคำขอพร้อมกัน:** ทั้งสองใช้คำสั่งแบบมีเงื่อนไข (`DELETE … WHERE id = ? AND status = 'PENDING'` / `UPDATE … WHERE id = ? AND status = 'PENDING'`) ใน transaction และเช็คจำนวนแถว — ฝั่งที่มาช้าได้ 400 หรือ 404 ข้อมูลไม่เพี้ยน (ทดสอบกับ Supabase จริง 5 รอบใน `npm run smoke:live`)
 

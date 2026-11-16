@@ -17,7 +17,7 @@ npm run dev                 # http://localhost:3000/api/health
 |---|---|
 | `npm run dev` | รันแบบ watch (tsx) |
 | `npm run build` / `npm start` | compile ไป `dist/` แล้วรันด้วย node |
-| `npm test` | 121 เทสต์: unit + ทุก endpoint + session/refresh + ยืนยันอีเมล + rate limit + ยกเลิก/อนุมัติพร้อมกัน + `verify.sql` + ความปลอดภัยของ seed บน PostgreSQL จำลอง (PGlite) ไม่ต้องมี credentials |
+| `npm test` | 127 เทสต์: unit + ทุก endpoint + session/refresh + ยืนยันอีเมล + rate limit + ยกเลิก/อนุมัติพร้อมกัน + `verify.sql` + ความปลอดภัยของ seed บน PostgreSQL จำลอง (PGlite) ไม่ต้องมี credentials |
 | `npm run typecheck` | ตรวจ type ทั้ง src และ tests |
 | `npm run seed:users` | สร้างบัญชีทดลอง 3 บัญชีใน Supabase Auth (ก่อนรัน `mock-data.sql`) |
 | `npm run smoke:live` | ทดสอบทุก endpoint กับ Supabase จริงผ่าน server ที่รันอยู่ (51 รายการ รวมยกเลิก/อนุมัติพร้อมกัน 5 รอบ) แล้วลบข้อมูลทดสอบ · ไม่สมัครผ่านหน้าสาธารณะ (ไม่ส่งอีเมล) · dev/demo เท่านั้น |
@@ -50,6 +50,6 @@ API ทั้งหมด: [docs/backend-api.md](../docs/backend-api.md)
 - ทุก route ที่แก้ข้อมูลตรวจเจ้าของจาก token ไม่เชื่อ `ownerId`/`userId` ใน body
 - รูปตรวจจากไบต์หัวไฟล์ (ไม่เชื่อนามสกุล/Content-Type) · ชื่อไฟล์สุ่ม
 - CORS เปิดเฉพาะ `CORS_ORIGIN`
-- Rate limit `/auth/login` `/auth/register` `/auth/refresh` ต่อ IP (`RATE_LIMIT_*`) · ไม่เชื่อ `X-Forwarded-For` จนกว่าจะตั้ง `TRUST_PROXY` · ตัวนับอยู่ใน Upstash Redis เมื่อตั้ง `UPSTASH_REDIS_REST_*` / `KV_REST_API_*` (บังคับบน Vercel) ไม่งั้นนับในหน่วยความจำ
+- Rate limit `/auth/login` `/auth/register` `/auth/refresh` ต่อ IP (`RATE_LIMIT_*`) · ไม่เชื่อ `X-Forwarded-For` จนกว่าจะตั้ง `TRUST_PROXY` · นับในหน่วยความจำของ process (Development / Demo)
 - สมัครสมาชิกใช้ `signUp` ปกติ (ยืนยันอีเมลตามการตั้งค่าโปรเจกต์) · Admin API ใช้เฉพาะ `seed:users`, logout และสคริปต์ทดสอบ
 - `SUPABASE_URL` ต้องเป็น Project URL อย่างเดียว (https หรือ http://localhost) ไม่งั้น server ไม่ยอมเริ่มพร้อมบอกว่าผิดตรงไหน

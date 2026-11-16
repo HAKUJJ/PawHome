@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { supabaseUrlSchema } from "../src/config/env.js";
-import { upstashStore } from "../src/middleware/rate-limit.js";
+import { envSchema, normalizeEnv, supabaseUrlSchema } from "../src/config/env.js";
 import { derivePetStatus } from "../src/services/adoptions.service.js";
 import { detectImageType } from "../src/services/uploads.service.js";
 import { adoptionInputSchema } from "../src/validators/adoptions.validator.js";
@@ -99,24 +98,38 @@ describe("validators", () => {
   });
 });
 
-describe("upstashStore (shared rate-limit counter)", () => {
-  it("sends INCR + PEXPIRE to /pipeline and returns the window count", async () => {
-    const sent: { url: string; auth: string | null; body: unknown }[] = [];
-    const fakeFetch = (async (url: string, init: RequestInit) => {
-      sent.push({ url, auth: new Headers(init.headers).get("Authorization"), body: JSON.parse(init.body as string) });
-      return new Response(JSON.stringify([{ result: 4 }, { result: 1 }]), { status: 200 });
-    }) as unknown as typeof fetch;
-    const now = 1_700_000_070_000; // ต้นนาที = 1_700_000_040_000 (หาร 60_000 ลงตัว) + 30 วินาที
-    const hit = await upstashStore("https://redis.example/", "tok", fakeFetch).hit("login:1.2.3.4", now);
-    expect(hit).toEqual({ count: 4, resetAt: 1_700_000_100_000 });
-    expect(sent[0].url).toBe("https://redis.example/pipeline");
-    expect(sent[0].auth).toBe("Bearer tok");
-    const key = "pawhome:rl:login:1.2.3.4:1700000040000";
-    expect(sent[0].body).toEqual([["INCR", key], ["PEXPIRE", key, "120000"]]);
+// Regression: ค่าที่วางใน Vercel Dashboard แบบนี้เคยทำให้ Function พังทั้งตัว (FUNCTION_INVOCATION_FAILED ทุก route)
+describe("environment values pasted into a hosting dashboard", () => {
+  const required = {
+    DATABASE_URL: "postgresql://u:p@h:6543/postgres?pgbouncer=true",
+    SUPABASE_URL: "https://abcd.supabase.co",
+    SUPABASE_ANON_KEY: "anon",
+    SUPABASE_SERVICE_ROLE_KEY: "service",
+  };
+  const parse = (extra: Record<string, string>) => envSchema.safeParse(normalizeEnv({ ...required, ...extra }));
+
+  it.each([
+    ["quoted", '"10"', 10],
+    ["single-quoted", "'15'", 15],
+    ["trailing comment", "20 # per IP", 20],
+    ["whitespace", "  25  ", 25],
+    ["empty → default", "", 10],
+  ])("RATE_LIMIT_REGISTER_PER_MINUTE %s", (_label, value, expected) => {
+    const result = parse({ RATE_LIMIT_REGISTER_PER_MINUTE: value });
+    expect(result.success).toBe(true);
+    expect(result.data?.RATE_LIMIT_REGISTER_PER_MINUTE).toBe(expected);
   });
 
-  it("throws when Redis errors (rateLimit then fails open)", async () => {
-    const fakeFetch = (async () => new Response("nope", { status: 500 })) as unknown as typeof fetch;
-    await expect(upstashStore("https://redis.example", "tok", fakeFetch).hit("k", 0)).rejects.toThrow(/500/);
+  it("quoted SUPABASE_URL is accepted", () => {
+    expect(parse({ SUPABASE_URL: '"https://abcd.supabase.co"' }).success).toBe(true);
+  });
+
+  it("still rejects real garbage and missing required values", () => {
+    expect(parse({ RATE_LIMIT_LOGIN_PER_MINUTE: "ten" }).success).toBe(false);
+    expect(envSchema.safeParse(normalizeEnv({ ...required, SUPABASE_SERVICE_ROLE_KEY: "  " })).success).toBe(false);
+  });
+
+  it("starts without any Redis settings, also on Vercel", () => {
+    expect(parse({ VERCEL: "1", TRUST_PROXY: "1" }).success).toBe(true);
   });
 });

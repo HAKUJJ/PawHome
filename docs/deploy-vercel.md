@@ -7,16 +7,15 @@ Repository เดียว (`HAKUJJ/PawHome`, branch `main`) → Vercel 2 Projec
 | `pawhome-api` | `backend` | Express | `https://<api-domain>` → API อยู่ที่ `https://<api-domain>/api/...` |
 | `pawhome-web` | `frontend` | Vite | `https://<web-domain>` |
 
-ลำดับ: **Upstash Redis → pawhome-api → pawhome-web → กลับไปตั้ง CORS/APP_URL ของ api → Supabase Auth URLs → ทดสอบ**
+ลำดับ: **pawhome-api → pawhome-web → กลับไปตั้ง CORS/APP_URL ของ api → Supabase Auth URLs → ทดสอบ**
 
-## 1. Upstash Redis (rate limit ร่วมกันทุก instance)
+## 1. Rate limit (ไม่ต้องใช้ Redis)
 
-Vercel Functions มีหลาย instance และสร้างใหม่ได้ตลอด ตัวนับในหน่วยความจำจึงกัน brute force ไม่ได้ → Backend **ไม่ยอมเริ่มทำงานบน Vercel** ถ้าไม่มี Redis
+Backend นับ rate limit ในหน่วยความจำของแต่ละ instance (`backend/src/middleware/rate-limit.ts`) — เหมาะกับ Development / Demo
+บน Vercel ตัวนับไม่รวมกันข้าม instance และเริ่มใหม่เมื่อ instance ใหม่ขึ้นมา จึงเป็นแค่ด่านพื้นฐาน · ด่านหลักบน Production:
 
-- ทางที่ง่ายที่สุด: Vercel Dashboard → project `pawhome-api` → Storage → Marketplace → **Upstash for Redis** (Free) → Connect → Vercel ใส่ `KV_REST_API_URL` / `KV_REST_API_TOKEN` ให้เอง
-- หรือสร้างที่ console.upstash.com แล้วใส่ `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` เอง
-- Redis ล่ม/ตอบช้าเกิน 2 วินาที → ปล่อยผ่าน (fail-open) และ log `rate limit store:` · Supabase Auth ยังมี rate limit ของตัวเองอีกชั้น
-- เสริม (ไม่บังคับ): Vercel Firewall → Rate Limiting (Hobby ได้ 1 rule) เช่น path `/api/auth/` 60 ครั้ง/นาที/IP เป็นด่านแรกก่อนถึง Function
+- **Vercel Firewall → Rate Limiting** (Hobby ได้ 1 rule): path ขึ้นต้น `/api/auth/` · 60 ครั้ง / 60 วินาที / IP · action Deny (429)
+- **Supabase → Authentication → Rate Limits** (มีอยู่แล้วในตัว)
 
 ## 2. pawhome-api (backend/)
 
@@ -36,8 +35,7 @@ Entry point: Vercel ตรวจเจอ `src/app.ts` (export default app) เ�
 | `CORS_ORIGIN` | `https://<web-domain>` | ไม่มี `/` ท้าย · หลายโดเมนคั่นด้วย `,` (ใส่ทีหลังเมื่อได้ URL ของ web) |
 | `APP_URL` | `https://<web-domain>` | ลิงก์ยืนยันอีเมลพากลับมา `<APP_URL>/login?verified=1` |
 | `TRUST_PROXY` | `1` | ตรวจแล้ว: Vercel เขียนทับ `X-Forwarded-For` ด้วย IP จริงของผู้ใช้ทุกครั้งและไม่ส่งต่อค่าที่ client ปลอมมา ([เอกสาร](https://vercel.com/docs/headers/request-headers)) → proxy 1 ชั้น |
-| `KV_REST_API_URL` + `KV_REST_API_TOKEN` 🔒 | จาก Upstash integration | หรือ `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` |
-| `RATE_LIMIT_*` | ไม่ต้องตั้ง (10 / 10 / 30) | เพิ่มได้ก่อนเดโมทั้งห้อง |
+| `RATE_LIMIT_*` | ไม่ต้องตั้ง (10 / 10 / 30) | ถ้าตั้ง ใส่ตัวเลขล้วน เช่น `10` (มีเครื่องหมายคำพูด/คอมเมนต์ติดมาระบบล้างให้ แต่ตัวอักษรอื่นจะ error) |
 
 ไม่ต้องตั้ง `PORT` (Vercel จัดการเอง) · `VERCEL=1` Vercel ตั้งให้เอง
 
@@ -75,14 +73,14 @@ Refresh token / หลายแท็บ: ทำที่ client (`frontend/src/
 ## 5. ข้อจำกัดของ Vercel ที่เกี่ยวข้อง
 
 - Request body สูงสุด 4.5 MB ต่อ request — อัปโหลดรูปจำกัดที่ 2 MB (multer, memory) และ JSON 100 KB จึงไม่ชน
-- ระยะเวลา Function ค่าเริ่มต้น 300 วินาที (Fluid compute) · เรียก Redis มี timeout 2 วินาที
+- ระยะเวลา Function ค่าเริ่มต้น 300 วินาที (Fluid compute)
 - รูปอัปโหลดไป Supabase Storage โดยตรง ไม่เขียนดิสก์ของ Function
 
 ## 6. Checklist ทดสอบหลัง Deploy (บน URL จริง)
 
 - [ ] `/api/health` → ok
 - [ ] สมัคร → ได้อีเมลยืนยัน → กดลิงก์กลับมา `https://<web-domain>/login?verified=1`
-- [ ] Login ด้วยบัญชีทดลอง · Login ผิด 11 ครั้งใน 1 นาที → 429
+- [ ] Login ด้วยบัญชีทดลอง · Login ผิดถี่ ๆ → 429 (นับต่อ instance + Vercel Firewall)
 - [ ] ดูรายการ/รายละเอียดสัตว์ · โพสต์/แก้/ลบ (เจ้าของเท่านั้น)
 - [ ] อัปโหลดรูป (≤ 2 MB, JPG/PNG/WEBP)
 - [ ] Favorites เพิ่ม/ลบ · คำขอรับเลี้ยง ส่ง/ยกเลิก/อนุมัติ
