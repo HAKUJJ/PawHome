@@ -110,3 +110,8 @@ Desktop.ini
 
 # ---------- MCP (ค่าเฉพาะเครื่อง: project_ref) — คัดลอกจาก .mcp.example.json ----------
 .mcp.json
+
+# ---------- ไม่เก็บใน Git (เก็บไว้ในเครื่องเท่านั้น) ----------
+docs/
+database/
+.claude/
