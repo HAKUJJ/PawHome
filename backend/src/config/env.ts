@@ -1,3 +1,4 @@
+import { isIP } from "node:net";
 import { z } from "zod";
 
 // โหลด backend/.env ถ้ามี (Node 22 มีให้ในตัว ไม่ต้องใช้ dotenv) — บน server จริงตั้ง env ผ่านระบบแทน
@@ -30,9 +31,22 @@ export const supabaseUrlSchema = z.string().superRefine((value, ctx) => {
 });
 
 // express "trust proxy": false = ใช้ IP ที่ต่อเข้ามาตรง ๆ (ไม่เชื่อ X-Forwarded-For) · ตัวเลข = จำนวน proxy ข้างหน้า
-const trustProxySchema = z
+// · หรือรายการ IP/subnet/ชื่อกลุ่ม (loopback, linklocal, uniquelocal) คั่นด้วย ,
+// ตรวจที่นี่ก่อน ไม่งั้นค่าผิด (เช่น "ๅ" = กดเลข 1 ตอนแป้นพิมพ์เป็นภาษาไทย) ไปพังใน app.set("trust proxy") ตอนโหลด ทำให้ Function ล่มทุก route
+const PROXY_PRESETS = new Set(["loopback", "linklocal", "uniquelocal"]);
+const isProxyAddress = (token: string) => {
+  if (PROXY_PRESETS.has(token)) return true;
+  const [ip, bits, ...rest] = token.split("/");
+  const version = isIP(ip);
+  if (!version || rest.length) return false;
+  return bits === undefined || (/^\d+$/.test(bits) ? Number(bits) <= (version === 4 ? 32 : 128) : isIP(bits) === 4);
+};
+export const trustProxySchema = z
   .string()
   .default("false")
+  .refine((v) => /^(true|false|\d+)$/.test(v) || v.split(",").every((t) => isProxyAddress(t.trim())), {
+    message: "TRUST_PROXY ต้องเป็น true / false / จำนวน proxy (Vercel ใช้ 1) หรือรายการ IP/subnet — ตรวจว่าไม่ได้พิมพ์ตอนแป้นพิมพ์เป็นภาษาไทย",
+  })
   .transform((v) => (v === "true" ? true : v === "false" ? false : /^\d+$/.test(v) ? Number(v) : v));
 
 const perMinute = (fallback: number) => z.coerce.number().int().positive().default(fallback);

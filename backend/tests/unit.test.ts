@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { envSchema, normalizeEnv, supabaseUrlSchema } from "../src/config/env.js";
+import express from "express";
+import { envSchema, normalizeEnv, supabaseUrlSchema, trustProxySchema } from "../src/config/env.js";
 import { derivePetStatus } from "../src/services/adoptions.service.js";
 import { detectImageType } from "../src/services/uploads.service.js";
 import { adoptionInputSchema } from "../src/validators/adoptions.validator.js";
@@ -114,6 +115,7 @@ describe("environment values pasted into a hosting dashboard", () => {
     ["trailing comment", "20 # per IP", 20],
     ["whitespace", "  25  ", 25],
     ["empty → default", "", 10],
+    ["leading tab (seen in production)", "	30", 30],
   ])("RATE_LIMIT_REGISTER_PER_MINUTE %s", (_label, value, expected) => {
     const result = parse({ RATE_LIMIT_REGISTER_PER_MINUTE: value });
     expect(result.success).toBe(true);
@@ -131,5 +133,42 @@ describe("environment values pasted into a hosting dashboard", () => {
 
   it("starts without any Redis settings, also on Vercel", () => {
     expect(parse({ VERCEL: "1", TRUST_PROXY: "1" }).success).toBe(true);
+  });
+});
+
+// Regression: Production เคยตั้ง TRUST_PROXY="ๅ" (กดเลข 1 ตอนแป้นพิมพ์เป็นภาษาไทย)
+// → express/proxy-addr โยน "invalid IP address" ตอนโหลด app.ts → FUNCTION_INVOCATION_FAILED ทุก route
+describe("TRUST_PROXY validation", () => {
+  it.each(["ๅ", "one", "1.2.3", "10.0.0.0/99", "loopback,abc"])("rejects %j with a message naming TRUST_PROXY", (value) => {
+    const result = trustProxySchema.safeParse(value);
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0].message).toMatch(/TRUST_PROXY/);
+  });
+
+  it.each([
+    ["1", 1],
+    ["true", true],
+    ["false", false],
+    ["loopback", "loopback"],
+    ["10.0.0.0/8, 127.0.0.1", "10.0.0.0/8, 127.0.0.1"],
+    ["::1", "::1"],
+  ])("accepts %j and Express accepts the result", (value, expected) => {
+    const parsed = trustProxySchema.parse(value);
+    expect(parsed).toEqual(expected);
+    expect(() => express().set("trust proxy", parsed)).not.toThrow();
+  });
+
+  it("whole env fails with a clear error instead of crashing later", () => {
+    const result = envSchema.safeParse(
+      normalizeEnv({
+        DATABASE_URL: "postgresql://u:p@h:6543/postgres",
+        SUPABASE_URL: "https://abcd.supabase.co",
+        SUPABASE_ANON_KEY: "a",
+        SUPABASE_SERVICE_ROLE_KEY: "b",
+        TRUST_PROXY: "ๅ",
+      }),
+    );
+    expect(result.success).toBe(false);
+    expect(result.error?.issues.map((i) => i.path.join("."))).toEqual(["TRUST_PROXY"]);
   });
 });
