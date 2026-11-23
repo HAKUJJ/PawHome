@@ -5,6 +5,7 @@ import { useAuthStore } from "../stores/useAuthStore";
 import { housingLabel, type AdoptionInput, type AdoptionRequest, type Housing } from "../types/adoption";
 import { timeAgo, type Pet } from "../types/pet";
 import AdoptionBadge from "./AdoptionBadge";
+import { useConfirmation } from "./ConfirmDialog";
 import { Field, inputClass } from "./Field";
 
 // กล่อง "ขอรับเลี้ยง" ในหน้ารายละเอียด (สำหรับคนที่ไม่ใช่เจ้าของโพสต์)
@@ -51,14 +52,19 @@ export default function AdoptionPanel({ pet }: { pet: Pet }) {
 
 function MyRequestStatus({ request }: { request: AdoptionRequest }) {
   const cancel = useCancelAdoption();
+  const { confirm, dialog } = useConfirmation();
 
-  function handleCancel() {
-    if (!window.confirm("ยกเลิกคำขอรับเลี้ยงนี้ใช่ไหม?")) return;
-    cancel.mutate(request.id);
-  }
+  const handleCancel = () => confirm({
+    title: "ยกเลิกคำขอรับเลี้ยง",
+    description: "ผู้โพสต์จะไม่เห็นคำขอนี้อีก ถ้าเปลี่ยนใจต้องยื่นคำขอใหม่",
+    label: "ยกเลิกคำขอ",
+    danger: true,
+    action: () => cancel.mutate(request.id),
+  });
 
   return (
     <Box title="คำขอรับเลี้ยงของคุณ">
+      {dialog}
       <div className="flex flex-wrap items-center gap-2">
         <AdoptionBadge status={request.status} />
         <span className="text-sm text-muted">ยื่นเมื่อ {timeAgo(request.createdAt)}</span>

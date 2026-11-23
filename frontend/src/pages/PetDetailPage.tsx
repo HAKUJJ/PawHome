@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import AdoptionPanel from "../components/AdoptionPanel";
+import { useConfirmation } from "../components/ConfirmDialog";
 import FavoriteButton from "../components/FavoriteButton";
 import OwnerRequests from "../components/OwnerRequests";
 import PetImage from "../components/PetImage";
@@ -19,12 +20,18 @@ export default function PetDetailPage() {
 
   const { data: pet, isLoading, isError, error, refetch } = usePet(petId);
   const deleteMutation = useDeletePet();
+  const { confirm, dialog } = useConfirmation();
 
   function handleDelete() {
     if (!pet) return;
-    if (!window.confirm(`ลบโพสต์ของ "${pet.name}" ใช่ไหม?`)) return;
-    deleteMutation.mutate(pet.id, {
-      onSuccess: () => navigate("/me?tab=posts"), // ลบเสร็จไปแท็บ "โพสต์ของฉัน" รายการอัปเดตเองเพราะ invalidateQueries
+    confirm({
+      title: `ลบโพสต์ของ "${pet.name}"`,
+      description: "โพสต์และคำขอรับเลี้ยงของน้องตัวนี้จะถูกลบ และกู้คืนไม่ได้",
+      label: "ลบโพสต์",
+      danger: true,
+      action: () => deleteMutation.mutate(pet.id, {
+        onSuccess: () => navigate("/me?tab=posts"), // ลบเสร็จไปแท็บ "โพสต์ของฉัน" รายการอัปเดตเองเพราะ invalidateQueries
+      }),
     });
   }
 
@@ -61,11 +68,11 @@ export default function PetDetailPage() {
     <PageShell>
       <div className="flex flex-wrap gap-8 items-start">
         <div className="flex-[1_1_420px] relative">
-          <PetImage src={pet.imageUrl} alt={`รูปน้อง${pet.name}`} className="w-full h-96 rounded-3xl" />
+          <PetImage src={pet.imageUrl} alt={`รูปน้อง${pet.name}`} showMissingLabel className="w-full h-96 rounded-3xl" />
           <FavoriteButton petId={pet.id} petName={pet.name} className="absolute top-4 right-4 size-12" />
         </div>
 
-        <div className="flex-[1_1_360px] flex flex-col gap-4">
+        <div className="flex-[1_1_360px] min-w-0 flex flex-col gap-4">
           <div className="flex flex-wrap gap-2">
             {pet.urgent && pet.status === "AVAILABLE" && (
               <span className="bg-danger text-white text-xs font-semibold px-3 py-1 rounded-full">ด่วน! ต้องการบ้าน</span>
@@ -75,12 +82,19 @@ export default function PetDetailPage() {
             </span>
           </div>
 
-          <div>
-            <h1 className="font-display font-bold text-4xl">{pet.name}</h1>
-            <p className="text-muted mt-1">
-              {speciesLabel[pet.species]} · {pet.breed} · {pet.province}
+          <div className="min-w-0">
+            {/* ชื่อยาวไม่มีช่องว่าง (เช่นตัวเลขยาว) ต้องตัดบรรทัดได้ ไม่ดันหน้าจนล้น */}
+            <h1 className="font-display font-bold text-4xl [overflow-wrap:anywhere]">{pet.name}</h1>
+            <p className="text-muted mt-1 [overflow-wrap:anywhere]">
+              {speciesLabel[pet.species]}{pet.breed && ` · ${pet.breed}`}
             </p>
-            <p className="text-sm text-muted mt-1">
+            {pet.province && (
+              <p className="mt-2 inline-flex max-w-full items-center gap-1.5 rounded-full bg-navy px-3 py-1 text-sm font-semibold text-white">
+                <svg aria-hidden="true" viewBox="0 0 24 24" className="size-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 21s-6-5.6-6-11a6 6 0 0 1 12 0c0 5.4-6 11-6 11Z" /><circle cx="12" cy="10" r="2.2" /></svg>
+                <span className="sr-only">จังหวัด </span><span className="[overflow-wrap:anywhere]">{pet.province}</span>
+              </p>
+            )}
+            <p className="text-sm text-muted mt-2">
               โพสต์โดย {isOwner ? "คุณ" : pet.ownerName} · {timeAgo(pet.createdAt)}
             </p>
           </div>
@@ -90,11 +104,16 @@ export default function PetDetailPage() {
             <InfoBox label="เพศ" value={sexLabel[pet.sex]} />
             <InfoBox label="วัคซีน" value={pet.vaccinated ? "ฉีดแล้ว" : "ยังไม่ฉีด"} />
             <InfoBox label="ทำหมัน" value={pet.sterilized ? "ทำแล้ว" : "ยังไม่ทำ"} />
+            <div className="col-span-2"><InfoBox label="สถานะการรับเลี้ยง" value={statusLabel[pet.status]} /></div>
           </dl>
 
           <section className="bg-white rounded-2xl border border-line p-5">
-            <h2 className="font-display font-semibold text-lg mb-2">เรื่องของ{pet.name}</h2>
-            <p className="leading-relaxed whitespace-pre-line">{pet.description}</p>
+            <h2 className="font-display font-semibold text-lg mb-2 [overflow-wrap:anywhere]">เรื่องของ{pet.name}</h2>
+            {pet.description ? (
+              <p className="leading-relaxed whitespace-pre-line [overflow-wrap:anywhere]">{pet.description}</p>
+            ) : (
+              <p className="text-muted">ผู้โพสต์ยังไม่ได้เขียนรายละเอียด</p>
+            )}
           </section>
 
           {isOwner ? (
@@ -121,6 +140,7 @@ export default function PetDetailPage() {
           ) : (
             <AdoptionPanel pet={pet} />
           )}
+          {dialog}
         </div>
       </div>
     </PageShell>

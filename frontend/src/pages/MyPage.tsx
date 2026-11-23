@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router";
 import AdoptionBadge from "../components/AdoptionBadge";
+import { useConfirmation } from "../components/ConfirmDialog";
 import { Field, inputClass } from "../components/Field";
 import PetCard from "../components/PetCard";
 import PetImage from "../components/PetImage";
@@ -192,14 +193,19 @@ function MyPosts() {
 // โพสต์ของตัวเอง: การ์ดเดิม + ปุ่มแก้ไข / ลบ (Backend ตรวจสิทธิ์เจ้าของซ้ำอีกชั้น)
 function MyPostItem({ pet }: { pet: Pet }) {
   const remove = useDeletePet();
+  const { confirm, dialog } = useConfirmation();
 
-  function handleDelete() {
-    if (!window.confirm(`ลบโพสต์ของ "${pet.name}" ใช่ไหม?`)) return;
-    remove.mutate(pet.id);
-  }
+  const handleDelete = () => confirm({
+    title: `ลบโพสต์ของ "${pet.name}"`,
+    description: "โพสต์และคำขอรับเลี้ยงของน้องตัวนี้จะถูกลบ และกู้คืนไม่ได้",
+    label: "ลบโพสต์",
+    danger: true,
+    action: () => remove.mutate(pet.id),
+  });
 
   return (
     <div className="flex flex-col gap-2">
+      {dialog}
       <PetCard pet={pet} />
       <div className="grid grid-cols-2 gap-2">
         <Link
@@ -258,14 +264,19 @@ function MyRequests() {
 
 function RequestRow({ request }: { request: AdoptionRequest }) {
   const cancel = useCancelAdoption();
+  const { confirm, dialog } = useConfirmation();
 
-  function handleCancel() {
-    if (!window.confirm(`ยกเลิกคำขอรับเลี้ยง${request.pet.name}ใช่ไหม?`)) return;
-    cancel.mutate(request.id);
-  }
+  const handleCancel = () => confirm({
+    title: `ยกเลิกคำขอรับเลี้ยง${request.pet.name}`,
+    description: "ผู้โพสต์จะไม่เห็นคำขอนี้อีก ถ้าเปลี่ยนใจต้องยื่นคำขอใหม่",
+    label: "ยกเลิกคำขอ",
+    danger: true,
+    action: () => cancel.mutate(request.id),
+  });
 
   return (
     <li className="bg-white rounded-2xl border border-line p-4 flex flex-wrap items-center gap-4">
+      {dialog}
       <PetImage src={request.pet.imageUrl} alt={`รูปน้อง${request.pet.name}`} className="size-20 rounded-xl shrink-0" />
       <div className="flex-[1_1_200px] flex flex-col gap-1">
         <div className="flex flex-wrap items-center gap-2">

@@ -2,6 +2,7 @@ import { usePetAdoptions, useReviewAdoption } from "../hooks/useAdoptions";
 import { housingLabel, type AdoptionRequest } from "../types/adoption";
 import { timeAgo } from "../types/pet";
 import AdoptionBadge from "./AdoptionBadge";
+import { useConfirmation } from "./ConfirmDialog";
 import { ErrorBox } from "./States";
 
 // เจ้าของโพสต์ดูคำขอรับเลี้ยงทั้งหมดของน้องตัวนี้ แล้วกด "อนุมัติ" หรือ "ไม่ผ่าน"
@@ -30,11 +31,21 @@ export default function OwnerRequests({ petId }: { petId: number }) {
 
 function RequestItem({ request }: { request: AdoptionRequest }) {
   const review = useReviewAdoption();
+  const { confirm, dialog } = useConfirmation();
 
-  function approve() {
-    if (!window.confirm(`อนุมัติให้ ${request.userName} รับน้องไปเลี้ยง? คำขออื่นที่รออยู่จะไม่ผ่านอัตโนมัติ`)) return;
-    review.mutate({ id: request.id, status: "APPROVED" });
-  }
+  const approve = () => confirm({
+    title: `อนุมัติคำขอของ ${request.userName}`,
+    description: "ให้ผู้ขอรายนี้รับน้องไปเลี้ยง · คำขออื่นที่รออยู่จะไม่ผ่านอัตโนมัติ",
+    label: "อนุมัติ",
+    action: () => review.mutate({ id: request.id, status: "APPROVED" }),
+  });
+  const reject = () => confirm({
+    title: `ไม่ผ่านคำขอของ ${request.userName}`,
+    description: "ผู้ขอจะเห็นว่าคำขอนี้ไม่ผ่าน และเปลี่ยนกลับไม่ได้",
+    label: "ไม่ผ่าน",
+    danger: true,
+    action: () => review.mutate({ id: request.id, status: "REJECTED" }),
+  });
 
   return (
     <li className="rounded-xl border border-line p-4 flex flex-col gap-2">
@@ -64,7 +75,7 @@ function RequestItem({ request }: { request: AdoptionRequest }) {
           </button>
           <button
             type="button"
-            onClick={() => review.mutate({ id: request.id, status: "REJECTED" })}
+            onClick={reject}
             disabled={review.isPending}
             className="min-h-11 px-5 rounded-xl border border-line font-semibold hover:border-danger hover:text-danger disabled:opacity-50"
           >
@@ -72,6 +83,7 @@ function RequestItem({ request }: { request: AdoptionRequest }) {
           </button>
         </div>
       )}
+      {dialog}
     </li>
   );
 }
