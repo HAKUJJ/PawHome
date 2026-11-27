@@ -30,13 +30,20 @@ describe("SUPABASE_URL validation", () => {
 });
 
 describe("derivePetStatus", () => {
+  const r = (stage: string, legacyReview = false) => ({ stage, legacyReview });
   it.each([
     [[], "AVAILABLE"],
-    [["REJECTED"], "AVAILABLE"],
-    [["PENDING", "REJECTED"], "PENDING"],
-    [["APPROVED", "REJECTED", "PENDING"], "ADOPTED"],
-  ] as const)("%j → %s", (statuses, expected) => {
-    expect(derivePetStatus([...statuses])).toBe(expected);
+    [[r("REJECTED"), r("CANCELLED")], "AVAILABLE"],
+    [[r("PENDING"), r("REJECTED")], "PENDING"],
+    // ตอบรับแล้ว / กำลังส่งมอบ ≠ ได้บ้านแล้ว
+    [[r("ACCEPTED")], "PENDING"],
+    [[r("ARRANGING_HANDOVER")], "PENDING"],
+    [[r("HANDOVER_REPORTED")], "PENDING"],
+    [[r("COMPLETED"), r("REJECTED")], "ADOPTED"],
+    // อนุมัติจากระบบเดิม (ยังไม่ตรวจ) คงสถานะได้บ้านแล้วไว้ก่อน
+    [[r("ACCEPTED", true)], "ADOPTED"],
+  ] as const)("%j → %s", (requests, expected) => {
+    expect(derivePetStatus([...requests])).toBe(expected);
   });
 });
 

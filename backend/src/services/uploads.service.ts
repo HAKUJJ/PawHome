@@ -13,6 +13,22 @@ export function detectImageType(buffer: Buffer): string | null {
   return null;
 }
 
+// ไฟล์ใน bucket ของเราที่ผู้ใช้คนนี้อัปโหลดเอง (path ขึ้นต้นด้วย userId/ ตาม uploadPetImage) — กันอ้างไฟล์ของคนอื่นหรือโดเมนภายนอก
+export function isOwnUpload(url: string, userId: string): boolean {
+  const prefix = supabaseAdmin.storage.from(env.STORAGE_BUCKET).getPublicUrl(`${userId}/`).data.publicUrl;
+  return url.startsWith(prefix) && /^[\w-]+\.(jpg|png|webp)$/.test(url.slice(prefix.length));
+}
+
+// ลบรูปเดิมใน Storage เมื่อเจ้าของเปลี่ยนรูป/ลบโพสต์ · ลบเฉพาะไฟล์ในโฟลเดอร์ของผู้ใช้คนนั้น (รูปภายนอก/ของคนอื่นไม่แตะ)
+// ลบไม่สำเร็จ = ไฟล์ค้างใน bucket เท่านั้น ข้อมูลในฐานข้อมูลบันทึกไปแล้ว จึงไม่ทำให้ request ล้ม
+export async function removeOwnUpload(url: string, userId: string): Promise<void> {
+  if (!url || !isOwnUpload(url, userId)) return;
+  const bucket = supabaseAdmin.storage.from(env.STORAGE_BUCKET);
+  const path = url.slice(bucket.getPublicUrl("").data.publicUrl.length);
+  const { error } = await bucket.remove([path]);
+  if (error) console.error("storage remove:", error.message);
+}
+
 export const uploadsService = {
   async uploadPetImage(userId: string, file: Express.Multer.File | undefined): Promise<{ url: string }> {
     if (!file) throw new ApiError(400, "กรุณาเลือกรูป (ช่องชื่อ image)");

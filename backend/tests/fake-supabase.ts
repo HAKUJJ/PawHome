@@ -14,6 +14,7 @@ const accounts = new Map<string, Account>(
 const accessTokens = new Map<string, { account: Account; expiresAt: number; sessionId: string }>();
 const refreshTokens = new Map<string, { account: Account; sessionId: string }>();
 export const uploadedPaths: string[] = [];
+export const removedPaths: string[] = [];
 export const signUps: { email: string; emailRedirectTo?: string }[] = [];
 
 const TOKEN_TTL_SECONDS = 3600;
@@ -46,6 +47,14 @@ function issueSession(account: Account, sessionId: string = randomUUID()) {
 
 export const tokenFor = (email: string) => issueSession(accounts.get(email)!).access_token;
 
+// บัญชีทดสอบเพิ่ม (ผู้ดูแล / ผู้ใช้อื่น) — insert auth.users จริง ให้ trigger สร้าง profile แล้วคืน { id, token }
+export async function registerAccount(email: string, name: string) {
+  const id = randomUUID();
+  await prisma.$executeRaw`insert into auth.users (id, email, raw_user_meta_data) values (${id}::uuid, ${email}, ${JSON.stringify({ name })}::jsonb)`;
+  accounts.set(email, { id, email, password: "123456", confirmed: true, name });
+  return { id, token: tokenFor(email) };
+}
+
 // ทำให้ access token หมดอายุทันที (จำลองผ่านไป 1 ชม.)
 export function expireToken(token: string) {
   const entry = accessTokens.get(token);
@@ -75,6 +84,10 @@ export const supabaseAdmin = {
       async upload(path: string) {
         uploadedPaths.push(path);
         return { data: { path }, error: null };
+      },
+      async remove(paths: string[]) {
+        removedPaths.push(...paths);
+        return { data: paths.map((name) => ({ name })), error: null };
       },
       getPublicUrl: (path: string) => ({ data: { publicUrl: `https://storage.test/${bucket}/${path}` } }),
     }),

@@ -26,6 +26,7 @@ create table storage.buckets (
   file_size_limit     bigint,
   allowed_mime_types  text[]
 );
+create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text references storage.buckets (id), name text);
 
 -- Supabase ให้สิทธิ์ตารางใน public กับ anon/authenticated เป็นค่าเริ่มต้น แล้วคุมด้วย RLS
 grant usage on schema auth, public to anon, authenticated;

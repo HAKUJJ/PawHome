@@ -11,15 +11,18 @@ cp .env.example .env        # Windows: copy .env.example .env  แล้วใ�
 npm run dev                 # http://localhost:3000/api/health
 ```
 
-ต้องรัน `database/schema.sql` ใน Supabase ก่อน (ดู [database/README.md](../database/README.md))
+ต้องรัน `database/schema.sql` ใน Supabase ก่อน (ดู [database/README.md](../database/README.md)) · ภาพรวมระบบ: [README หลัก](../README.md)
 
 | Script | ทำอะไร |
 |---|---|
 | `npm run dev` | รันแบบ watch (tsx) |
 | `npm run build` / `npm start` | compile ไป `dist/` แล้วรันด้วย node |
-| `npm test` | 127 เทสต์: unit + ทุก endpoint + session/refresh + ยืนยันอีเมล + rate limit + ยกเลิก/อนุมัติพร้อมกัน + `verify.sql` + ความปลอดภัยของ seed บน PostgreSQL จำลอง (PGlite) ไม่ต้องมี credentials |
+| `npm test` | unit + ทุก endpoint + session/refresh + ยืนยันอีเมล + rate limit + ยกเลิก/อนุมัติพร้อมกัน + `verify.sql` / `verify-admin.sql` + migration + Admin RBAC + ขั้นตอนส่งมอบ บน PostgreSQL จำลอง (PGlite) ไม่ต้องมี credentials · 213 เทสต์ผ่าน (ตรวจ 27 พ.ย. 2026) |
 | `npm run typecheck` | ตรวจ type ทั้ง src และ tests |
 | `npm run seed:users` | สร้างบัญชีทดลอง 3 บัญชีใน Supabase Auth (ก่อนรัน `mock-data.sql`) |
+| `npm run admin:bootstrap -- --user <uuid> --confirm-host <host>` | แต่งตั้ง SUPER_ADMIN คนแรก (ครั้งเดียว · ต้องยืนยัน host ของฐานข้อมูล) — [ขั้นตอน](../docs/admin-super-admin-bootstrap.md) · ห้ามรันกับ Production โดยไม่ได้รับอนุมัติ |
+| `npm run seed:demo-users` | สร้างบัญชีทดสอบ 40 บัญชีของชุดข้อมูล `pawhome-demo-v1` ผ่าน Supabase Admin API · Development เท่านั้น (ต้องตั้ง `SEED_TARGET`, `SEED_ALLOWED_PROJECT_REFS`, `DEMO_USER_PASSWORD`) — [คู่มือ](../docs/mock-data-guide.md) |
+| `npm run seed:generate` | สร้าง `database/seeds/*.sql` ใหม่จาก `scripts/generate-demo-seed.ts` (deterministic) |
 | `npm run smoke:live` | ทดสอบทุก endpoint กับ Supabase จริงผ่าน server ที่รันอยู่ (51 รายการ รวมยกเลิก/อนุมัติพร้อมกัน 5 รอบ) แล้วลบข้อมูลทดสอบ · ไม่สมัครผ่านหน้าสาธารณะ (ไม่ส่งอีเมล) · dev/demo เท่านั้น |
 
 ## โครงสร้าง
@@ -29,19 +32,30 @@ src/
 ├─ app.ts              express app (cors, json, /api/health, routes, error handler)
 ├─ server.ts           listen
 ├─ config/             env (ตรวจด้วย Zod), prisma, supabase (service role + anon client)
-├─ routes/index.ts     รายชื่อ 21 endpoint
-├─ middleware/         auth (ตรวจ Supabase token) · error (ApiError → { message }) · upload (multer)
+├─ routes/index.ts     route สาธารณะ + ผู้ใช้
+├─ routes/admin.ts     /api/admin/* (In Development — ยังไม่ deploy)
+├─ middleware/         auth (ตรวจ Supabase token + บัญชีถูกระงับ) · admin (RBAC จาก admin_memberships) · error (ApiError → { message }) · upload (multer)
 ├─ controllers/        แปลง HTTP ↔ service · parse input ด้วย validators
-├─ services/           กฎธุรกิจ + ตรวจสิทธิ์เจ้าของ + transaction
+├─ services/           กฎธุรกิจ + ตรวจสิทธิ์เจ้าของ + transaction · adoption-workflow.ts (กฎขั้นตอนแบบฟังก์ชันล้วน) · admin*.service.ts · follow-up.service.ts (cron)
 ├─ repositories/       query ผ่าน Prisma + แปลงแถวเป็นรูปแบบที่หน้าเว็บใช้
 ├─ validators/         Zod schema (กฎเดียวกับฟอร์มในหน้าเว็บ)
 └─ types/dto.ts        type ที่ส่งให้หน้าเว็บ (ตรงกับ frontend/src/types)
-prisma/schema.prisma   แผนที่ตาราง (โครงสร้างจริงอยู่ที่ database/schema.sql)
+prisma/schema.prisma   แผนที่ตาราง (โครงสร้างจริงอยู่ที่ database/schema.sql + database/migrations/)
 scripts/seed-users.ts  บัญชีทดลอง
-tests/                 global-setup (PGlite) · fake-supabase · api / database / unit tests
+tests/                 global-setup (PGlite 2 ก้อน) · fake-supabase · api / database / unit / admin / workflow tests
 ```
 
-API ทั้งหมด: [docs/backend-api.md](../docs/backend-api.md)
+API: ดูตารางใน [README หลัก](../README.md#-api-overview) และโค้ดใน [src/routes/](src/routes/) · งานผู้ดูแล: [docs/admin-fullstack-implementation.md](../docs/admin-fullstack-implementation.md)
+
+## ตัวแปรของงาน Admin (ยังไม่ deploy · มีตัวอย่างใน `.env.example`)
+
+| ตัวแปร | ค่าเริ่มต้น | หมายเหตุ |
+|---|---|---|
+| `ADOPTION_HANDOVER_WORKFLOW` | `false` | `true` = เปิดขั้นตอนส่งมอบ (ตอบรับ → นัด → รายงานสองฝ่าย → ยืนยัน) |
+| `FOLLOW_UP_REMINDER_HOURS` / `FOLLOW_UP_ADMIN_HOURS` / `FOLLOW_UP_ESCALATION_HOURS` | `24` / `48` / `72` | ต้องเรียงจากน้อยไปมาก |
+| `CRON_SECRET` | — | อย่างน้อย 32 ตัวอักษร · ไม่ตั้ง = ปิด `GET /api/internal/cron/follow-ups` |
+
+ต้องรัน `database/migrations/001_admin_workflow.sql` ก่อนใช้โค้ดชุดนี้กับฐานข้อมูลจริง
 
 ## ความปลอดภัย
 

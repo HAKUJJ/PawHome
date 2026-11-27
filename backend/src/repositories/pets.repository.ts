@@ -1,6 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../config/prisma.js";
-import type { Pet, PetStatus, Sex, Species } from "../types/dto.js";
+import type { Pet, PetStatus, PetVisibility, Sex, Species } from "../types/dto.js";
 import type { PetFilters, PetInput } from "../validators/pets.validator.js";
 
 type Db = Prisma.TransactionClient;
@@ -26,6 +26,8 @@ export function toPet(row: PetRow): Pet {
     createdAt: row.createdAt.toISOString(),
     ownerId: row.ownerId,
     ownerName: row.owner.name,
+    visibility: row.visibility as PetVisibility,
+    moderationReason: row.moderationReason,
   };
 }
 
@@ -34,7 +36,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export const petsRepository = {
   // shortcut: ไม่มี pagination เพราะหน้าเว็บแสดง "พบ N ตัว" จากรายการทั้งหมด, ถ้าน้องเกินหลักพันให้เพิ่ม ?page&limit ทั้งสองฝั่ง
   async list(filters: PetFilters): Promise<Pet[]> {
-    const where: Prisma.PetWhereInput = {};
+    const where: Prisma.PetWhereInput = { visibility: "VISIBLE" }; // โพสต์ที่ถูกซ่อน/ส่งกลับแก้ไขไม่แสดงสาธารณะ
     if (filters.species) where.species = filters.species;
     if (filters.province) where.province = filters.province;
     if (filters.urgent !== undefined) where.urgent = filters.urgent;
@@ -60,8 +62,10 @@ export const petsRepository = {
     return toPet(await prisma.pet.create({ data: { ...input, ownerId }, include: withOwner }));
   },
 
-  async update(id: number, input: PetInput): Promise<Pet> {
-    return toPet(await prisma.pet.update({ where: { id }, data: input, include: withOwner }));
+  // โพสต์ที่ถูกส่งกลับแก้ไข: เจ้าของแก้แล้ว → รอผู้ดูแลตรวจอีกครั้ง (ยังไม่แสดงสาธารณะ)
+  async update(id: number, input: PetInput, resubmit = false): Promise<Pet> {
+    const data = resubmit ? { ...input, visibility: "REVIEW" } : input;
+    return toPet(await prisma.pet.update({ where: { id }, data, include: withOwner }));
   },
 
   // favorites + adoption_requests ของน้องตัวนี้ถูกลบตาม (ON DELETE CASCADE)

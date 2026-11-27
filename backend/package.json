@@ -10,6 +10,10 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "seed:users": "tsx scripts/seed-users.ts",
+    "admin:bootstrap": "tsx scripts/grant-super-admin.ts",
+    "seed:demo-users": "tsx scripts/seed-demo-users.ts",
+    "seed:generate": "tsx scripts/generate-demo-seed.ts",
+    "dev:demo": "tsx --import ./tests/e2e/loader.mjs tests/e2e/server.ts --demo",
     "smoke:live": "tsx scripts/smoke-live.ts",
     "postinstall": "prisma generate"
   },

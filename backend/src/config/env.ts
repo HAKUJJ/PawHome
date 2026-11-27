@@ -50,6 +50,8 @@ export const trustProxySchema = z
   .transform((v) => (v === "true" ? true : v === "false" ? false : /^\d+$/.test(v) ? Number(v) : v));
 
 const perMinute = (fallback: number) => z.coerce.number().int().positive().default(fallback);
+const hours = (fallback: number) => z.coerce.number().int().positive().max(24 * 30).default(fallback);
+const flag = z.enum(["true", "false"]).default("false").transform((v) => v === "true");
 
 // ค่าที่วางใน Vercel Dashboard มักติดมาจากไฟล์ .env: ช่องว่าง, เครื่องหมายคำพูดครอบ, คอมเมนต์ท้ายบรรทัด, ค่าว่าง
 // → ล้างก่อนตรวจ (ค่าว่าง = ไม่ได้ตั้ง ใช้ค่าเริ่มต้น) ไม่ให้ Function พังทั้งตัวเพราะ RATE_LIMIT_*="10"
@@ -80,6 +82,17 @@ const schema = z.object({
   RATE_LIMIT_LOGIN_PER_MINUTE: perMinute(10),
   RATE_LIMIT_REGISTER_PER_MINUTE: perMinute(10),
   RATE_LIMIT_REFRESH_PER_MINUTE: perMinute(30), // refresh เกิดเองอัตโนมัติ ทุกแท็บ ทุกผู้ใช้หลัง NAT เดียวกัน
+  // false (ค่าเริ่มต้น) = เจ้าของอนุมัติแล้วน้องเป็น ADOPTED ทันทีแบบเดิม แต่ทุกคำขอเข้าคิวให้ผู้ดูแลยืนยันการส่งมอบ
+  // true = ขั้นตอนส่งมอบเต็ม (ตอบรับ → นัดส่งมอบ → รายงานสองฝ่าย → ยืนยัน) · เปิดเมื่อหน้าเว็บสาธารณะมีปุ่มรายงานส่งมอบแล้ว
+  ADOPTION_HANDOVER_WORKFLOW: flag,
+  // นโยบายติดตาม: เจ้าของเงียบขณะ PENDING กี่ชั่วโมง → เตือน / ผู้ดูแลติดตาม / ส่งต่อเร่งด่วน
+  FOLLOW_UP_REMINDER_HOURS: hours(24),
+  FOLLOW_UP_ADMIN_HOURS: hours(48),
+  FOLLOW_UP_ESCALATION_HOURS: hours(72),
+  // Vercel Cron ส่ง "Authorization: Bearer <CRON_SECRET>" · ไม่ตั้ง = ปิด endpoint cron
+  CRON_SECRET: z.string().min(32, "CRON_SECRET ต้องยาวอย่างน้อย 32 ตัวอักษร").optional(),
+}).refine((e) => e.FOLLOW_UP_REMINDER_HOURS < e.FOLLOW_UP_ADMIN_HOURS && e.FOLLOW_UP_ADMIN_HOURS < e.FOLLOW_UP_ESCALATION_HOURS, {
+  message: "FOLLOW_UP_*_HOURS ต้องเรียง REMINDER < ADMIN < ESCALATION",
 });
 
 export const envSchema = schema;

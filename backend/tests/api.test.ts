@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("../src/config/supabase.js", () => import("./fake-supabase.js"));
 
 const { app } = await import("../src/app.js");
-const { confirmEmail, expireToken, failNextAuthCall, setConfirmEmailRequired, signUps, tokenFor, uploadedPaths } =
+const { confirmEmail, expireToken, failNextAuthCall, setConfirmEmailRequired, signUps, tokenFor, uploadedPaths, removedPaths } =
   await import("./fake-supabase.js");
 const { prisma } = await import("../src/config/prisma.js");
 
@@ -36,7 +36,31 @@ describe("health + errors", () => {
   it("GET /api/health → database ok", async () => {
     const res = await api.get("/api/health");
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ status: "ok", database: "ok" });
+    expect(res.body).toEqual({ status: "ok", database: "ok", schema: "ok" });
+  });
+
+  it("GET /api/ready → ready when migrations 001–003 are applied", async () => {
+    const res = await api.get("/api/ready");
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ status: "ready", database: "ok", schema: "ok" });
+  });
+
+  it("missing migration → health stays 200 (schema pending) but ready is 503 and names it", async () => {
+    await prisma.$executeRawUnsafe("alter table public.adoption_requests drop constraint adoption_requests_stage_status_consistent");
+    try {
+      const health = await api.get("/api/health");
+      expect(health.status).toBe(200);
+      expect(health.body).toEqual({ status: "ok", database: "ok", schema: "pending", missing: ["003"] });
+      const ready = await api.get("/api/ready");
+      expect(ready.status).toBe(503);
+      expect(ready.body).toEqual({ status: "not_ready", database: "ok", schema: "missing migrations", missing: ["003"] });
+    } finally {
+      await prisma.$executeRawUnsafe(`alter table public.adoption_requests add constraint adoption_requests_stage_status_consistent check (
+        (stage = 'PENDING' and status = 'PENDING')
+        or (stage in ('ACCEPTED', 'ARRANGING_HANDOVER', 'HANDOVER_REPORTED', 'COMPLETED') and status = 'APPROVED')
+        or (stage = 'REJECTED' and status = 'REJECTED')
+        or (stage = 'CANCELLED' and status = 'CANCELLED'))`);
+    }
   });
 
   it("unknown route → 404 { message }", async () => {
@@ -405,6 +429,21 @@ describe("uploads", () => {
     expect(res.status).toBe(201);
     expect(res.body.url).toMatch(/^https:\/\/storage\.test\/pet-images\/00000000-0000-4000-8000-000000000001\/[0-9a-f-]{36}\.png$/);
     expect(uploadedPaths).toHaveLength(1);
+  });
+
+  it("replacing or deleting a pet image removes the old file from Storage", async () => {
+    const upload = async () => (await api.post("/api/uploads").set(auth(pong)).attach("image", png, { filename: "a.png", contentType: "image/png" })).body.url as string;
+    const pathOf = (url: string) => url.replace("https://storage.test/pet-images/", "");
+    const first = await upload();
+    const pet = (await api.post("/api/pets").set(auth(pong)).send({ ...newPet, imageUrl: first })).body;
+    expect(pet.imageUrl).toBe(first);
+    const second = await upload();
+    expect((await api.put(`/api/pets/${pet.id}`).set(auth(pong)).send({ ...newPet, imageUrl: second })).status).toBe(200);
+    expect(removedPaths).toEqual([pathOf(first)]);
+    expect((await api.put(`/api/pets/${pet.id}`).set(auth(pong)).send({ ...newPet, imageUrl: second })).status).toBe(200);
+    expect(removedPaths).toHaveLength(1); // same image → nothing removed
+    expect((await api.delete(`/api/pets/${pet.id}`).set(auth(pong))).status).toBe(204);
+    expect(removedPaths).toEqual([pathOf(first), pathOf(second)]);
   });
 
   it("rejects missing, fake and oversized files", async () => {

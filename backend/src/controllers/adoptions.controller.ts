@@ -1,7 +1,7 @@
 import type { RequestHandler } from "express";
 import { currentUser } from "../middleware/auth.js";
 import { adoptionsService } from "../services/adoptions.service.js";
-import { adoptionInputSchema, reviewSchema } from "../validators/adoptions.validator.js";
+import { adoptionInputSchema, disputeSchema, handoverReportSchema, reviewSchema } from "../validators/adoptions.validator.js";
 import { parseId } from "../validators/common.validator.js";
 
 const petId = (value: unknown) => parseId(value, "ไม่พบน้องที่ต้องการ");
@@ -10,6 +10,14 @@ const requestId = (value: unknown) => parseId(value, "ไม่พบคำข�
 export const adoptionsController = {
   listMine: (async (_req, res) => {
     res.json(await adoptionsService.listMine(currentUser(res).id));
+  }) satisfies RequestHandler,
+
+  get: (async (req, res) => {
+    res.json(await adoptionsService.get(currentUser(res).id, requestId(req.params.id)));
+  }) satisfies RequestHandler,
+
+  timeline: (async (req, res) => {
+    res.json(await adoptionsService.timeline(currentUser(res).id, requestId(req.params.id)));
   }) satisfies RequestHandler,
 
   listForPet: (async (req, res) => {
@@ -30,5 +38,23 @@ export const adoptionsController = {
     const id = requestId(req.params.id);
     const { status } = reviewSchema.parse(req.body);
     res.json(await adoptionsService.review(currentUser(res).id, id, status));
+  }) satisfies RequestHandler,
+
+  arrange: (async (req, res) => {
+    res.json(await adoptionsService.arrange(currentUser(res).id, requestId(req.params.id)));
+  }) satisfies RequestHandler,
+
+  report: (async (req, res) => {
+    const id = requestId(req.params.id);
+    res.status(201).json(await adoptionsService.report(currentUser(res).id, id, handoverReportSchema.parse(req.body)));
+  }) satisfies RequestHandler,
+
+  confirm: (async (req, res) => {
+    res.json(await adoptionsService.confirm(currentUser(res).id, requestId(req.params.id)));
+  }) satisfies RequestHandler,
+
+  dispute: (async (req, res) => {
+    const id = requestId(req.params.id);
+    res.json(await adoptionsService.dispute(currentUser(res).id, id, disputeSchema.parse(req.body)));
   }) satisfies RequestHandler,
 };

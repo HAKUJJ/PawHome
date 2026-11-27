@@ -1,5 +1,5 @@
 import type { RequestHandler } from "express";
-import { currentUser } from "../middleware/auth.js";
+import { currentUser, optionalUser } from "../middleware/auth.js";
 import { petsService } from "../services/pets.service.js";
 import { parseId } from "../validators/common.validator.js";
 import { petFiltersSchema, petInputSchema } from "../validators/pets.validator.js";
@@ -12,7 +12,7 @@ export const petsController = {
   }) satisfies RequestHandler,
 
   get: (async (req, res) => {
-    res.json(await petsService.get(petId(req.params.id)));
+    res.json(await petsService.get(petId(req.params.id), optionalUser(res)?.id));
   }) satisfies RequestHandler,
 
   listMine: (async (_req, res) => {

@@ -1,4 +1,4 @@
-// แผนที่ตารางให้ Prisma ใช้ query เท่านั้น — โครงสร้างจริงมาจาก database/schema.sql
+// แผนที่ตารางให้ Prisma ใช้ query เท่านั้น — โครงสร้างจริงมาจาก database/schema.sql + database/migrations/*.sql
 // ห้ามรัน `prisma migrate` / `prisma db push` (จะไม่สร้าง RLS, trigger, FK ไป auth.users)
 // แก้ตาราง: แก้ SQL ก่อน แล้วค่อยแก้ไฟล์นี้ให้ตรงกัน
 
@@ -21,6 +21,8 @@ model Profile {
   pets             Pet[]
   favorites        Favorite[]
   adoptionRequests AdoptionRequest[]
+  adminMembership  AdminMembership?  @relation("member")
+  suspension       UserSuspension?   @relation("suspended")
 
   @@map("profiles")
 }
@@ -41,6 +43,11 @@ model Pet {
   sterilized       Boolean           @default(false)
   urgent           Boolean           @default(false)
   status           String            @default("AVAILABLE")
+  // VISIBLE | HIDDEN | CHANGES_REQUESTED | REVIEW (migration 001)
+  visibility       String            @default("VISIBLE")
+  moderationReason String            @default("") @map("moderation_reason")
+  moderatedAt      DateTime?         @map("moderated_at") @db.Timestamptz
+  moderatedBy      String?           @map("moderated_by") @db.Uuid
   createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz
   updatedAt        DateTime          @default(now()) @map("updated_at") @db.Timestamptz
   favorites        Favorite[]
@@ -61,18 +68,161 @@ model Favorite {
 }
 
 model AdoptionRequest {
-  id        Int      @id @default(autoincrement())
-  petId     Int      @map("pet_id")
-  userId    String   @map("user_id") @db.Uuid
-  pet       Pet      @relation(fields: [petId], references: [id], onDelete: Cascade)
-  user      Profile  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  phone     String
-  housing   String
-  message   String
-  status    String   @default("PENDING")
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz
+  id                   Int                       @id @default(autoincrement())
+  petId                Int                       @map("pet_id")
+  userId               String                    @map("user_id") @db.Uuid
+  pet                  Pet                       @relation(fields: [petId], references: [id], onDelete: Cascade)
+  user                 Profile                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phone                String
+  housing              String
+  message              String
+  // status เดิม (PENDING | APPROVED | REJECTED | CANCELLED) — ต้องตรงกับ stage เสมอ (constraint ในฐานข้อมูล)
+  status               String                    @default("PENDING")
+  stage                String                    @default("PENDING")
+  lastActivityAt       DateTime                  @default(now()) @map("last_activity_at") @db.Timestamptz
+  followUpRequired     Boolean                   @default(false) @map("follow_up_required")
+  escalated            Boolean                   @default(false)
+  disputed             Boolean                   @default(false)
+  legacyReview         Boolean                   @default(false) @map("legacy_review")
+  handoverVersion      Int                       @default(0) @map("handover_version")
+  ownerConfirmedAt     DateTime?                 @map("owner_confirmed_at") @db.Timestamptz
+  applicantConfirmedAt DateTime?                 @map("applicant_confirmed_at") @db.Timestamptz
+  completedAt          DateTime?                 @map("completed_at") @db.Timestamptz
+  verifiedAt           DateTime?                 @map("verified_at") @db.Timestamptz
+  verifiedBy           String?                   @map("verified_by") @db.Uuid
+  resolution           String                    @default("")
+  closedAt             DateTime?                 @map("closed_at") @db.Timestamptz
+  createdAt            DateTime                  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime                  @default(now()) @map("updated_at") @db.Timestamptz
+  history              AdoptionStageHistory[]
+  handoverReports      AdoptionHandoverReport[]
+  followUps            AdoptionFollowUp[]
+  notifications        NotificationEvent[]
 
   @@unique([userId, petId])
   @@map("adoption_requests")
+}
+
+model AdminMembership {
+  userId    String   @id @map("user_id") @db.Uuid
+  user      Profile  @relation("member", fields: [userId], references: [id], onDelete: Cascade)
+  role      String // ADMIN | SUPER_ADMIN
+  grantedBy String?  @map("granted_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  @@map("admin_memberships")
+}
+
+model UserSuspension {
+  userId      String   @id @map("user_id") @db.Uuid
+  user        Profile  @relation("suspended", fields: [userId], references: [id], onDelete: Cascade)
+  reason      String
+  suspendedBy String?  @map("suspended_by") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("user_suspensions")
+}
+
+model AdoptionStageHistory {
+  id        BigInt          @id @default(autoincrement())
+  requestId Int             @map("request_id")
+  request   AdoptionRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  fromStage String?         @map("from_stage")
+  toStage   String          @map("to_stage")
+  actorId   String?         @map("actor_id") @db.Uuid
+  actorRole String          @map("actor_role") // OWNER | APPLICANT | ADMIN | SYSTEM
+  note      String          @default("")
+  createdAt DateTime        @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("adoption_stage_history")
+}
+
+model AdoptionHandoverReport {
+  id           BigInt          @id @default(autoincrement())
+  requestId    Int             @map("request_id")
+  request      AdoptionRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  party        String // OWNER | APPLICANT
+  handoverDate DateTime        @map("handover_date") @db.Date
+  outcome      String // HANDED_OVER | NOT_HANDED_OVER
+  note         String          @default("")
+  evidenceUrl  String          @default("") @map("evidence_url")
+  version      Int
+  reporterId   String?         @map("reporter_id") @db.Uuid
+  createdAt    DateTime        @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("adoption_handover_reports")
+}
+
+model AdoptionFollowUp {
+  id        BigInt          @id @default(autoincrement())
+  requestId Int             @map("request_id")
+  request   AdoptionRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  kind      String
+  note      String          @default("")
+  actorId   String?         @map("actor_id") @db.Uuid
+  createdAt DateTime        @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("adoption_follow_ups")
+}
+
+// แจ้งเตือนในเว็บ (migration 001 + 002) · อ้างคำขอ หรือ ประกาศ อย่างใดอย่างหนึ่ง
+// unique index กันซ้ำอยู่ใน SQL (expression index ที่ Prisma ระบุไม่ได้) — createMany ใช้ skipDuplicates
+model NotificationEvent {
+  id             BigInt           @id @default(autoincrement())
+  requestId      Int?             @map("request_id")
+  request        AdoptionRequest? @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  announcementId Int?             @map("announcement_id")
+  announcement   Announcement?    @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  recipientId    String?          @map("recipient_id") @db.Uuid
+  kind           String
+  activityAt     DateTime         @map("activity_at") @db.Timestamptz
+  channel        String           @default("IN_APP")
+  payload        Json             @default("{}")
+  readAt         DateTime?        @map("read_at") @db.Timestamptz
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("notification_events")
+}
+
+model AdminAuditLog {
+  id         BigInt   @id @default(autoincrement())
+  actorId    String?  @map("actor_id") @db.Uuid
+  actorRole  String   @default("") @map("actor_role")
+  action     String
+  targetType String   @map("target_type")
+  targetId   String   @default("") @map("target_id")
+  result     String   @default("SUCCESS")
+  changes    Json     @default("{}")
+  reason     String   @default("")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("admin_audit_logs")
+}
+
+model Announcement {
+  id           Int       @id @default(autoincrement())
+  title        String
+  category     String    @default("")
+  description  String    @default("")
+  eventDate    DateTime? @map("event_date") @db.Date
+  eventTime    String    @default("") @map("event_time")
+  location     String    @default("")
+  contact      String    @default("")
+  cta          String    @default("")
+  destination  String    @default("/")
+  imageUrl     String    @default("") @map("image_url")
+  status       String    @default("DRAFT") // DRAFT | PUBLISHED
+  displayOrder Int       @default(0) @map("display_order")
+  isDemo       Boolean   @default(false) @map("is_demo")
+  publishedAt  DateTime? @map("published_at") @db.Timestamptz
+  publishAt    DateTime? @map("publish_at") @db.Timestamptz // ตั้งเวลาเผยแพร่ (migration 002)
+  expireAt     DateTime? @map("expire_at") @db.Timestamptz // หมดอายุ (migration 002)
+  notifications NotificationEvent[]
+  createdBy    String?   @map("created_by") @db.Uuid
+  updatedBy    String?   @map("updated_by") @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime  @default(now()) @map("updated_at") @db.Timestamptz
+
+  @@map("announcements")
 }
