@@ -22,7 +22,6 @@ model Profile {
   favorites        Favorite[]
   adoptionRequests AdoptionRequest[]
   adminMembership  AdminMembership?  @relation("member")
-  suspension       UserSuspension?   @relation("suspended")
 
   @@map("profiles")
 }
@@ -114,15 +113,6 @@ model AdminMembership {
   @@map("admin_memberships")
 }
 
-model UserSuspension {
-  userId      String   @id @map("user_id") @db.Uuid
-  user        Profile  @relation("suspended", fields: [userId], references: [id], onDelete: Cascade)
-  reason      String
-  suspendedBy String?  @map("suspended_by") @db.Uuid
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
-
-  @@map("user_suspensions")
-}
 
 model AdoptionStageHistory {
   id        BigInt          @id @default(autoincrement())
@@ -185,20 +175,6 @@ model NotificationEvent {
   @@map("notification_events")
 }
 
-model AdminAuditLog {
-  id         BigInt   @id @default(autoincrement())
-  actorId    String?  @map("actor_id") @db.Uuid
-  actorRole  String   @default("") @map("actor_role")
-  action     String
-  targetType String   @map("target_type")
-  targetId   String   @default("") @map("target_id")
-  result     String   @default("SUCCESS")
-  changes    Json     @default("{}")
-  reason     String   @default("")
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
-
-  @@map("admin_audit_logs")
-}
 
 model Announcement {
   id           Int       @id @default(autoincrement())

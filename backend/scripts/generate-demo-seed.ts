@@ -26,7 +26,6 @@ const user = (key: string) => DEMO_DATASET_USERS.find((u) => u.key === key)!;
 const byPersona = (persona: string) => DEMO_DATASET_USERS.filter((u) => u.persona === persona);
 const superAdmin = user("u01");
 const admins = [user("u02"), user("u03")];
-const suspendedUser = user("u39");
 
 // ---------- โครงข้อมูล ----------
 type Stage = "PENDING" | "ACCEPTED" | "ARRANGING_HANDOVER" | "HANDOVER_REPORTED" | "COMPLETED" | "REJECTED" | "CANCELLED";
@@ -56,7 +55,6 @@ interface Notification {
   // เวลาเหตุการณ์ที่อ้าง: แถวไทม์ไลน์ / last_activity ของคำขอ (cron) / เวลาเผยแพร่ประกาศ
   ref: { history: History } | { activity: Req } | { announcement: Announcement }; readAgo: number | null;
 }
-interface Audit { id: number; actor: DemoUser; action: string; targetType: string; target: string; changes: Record<string, unknown>; reason: string; ago: number }
 
 const pets: Pet[] = [];
 const requests: Req[] = [];
@@ -64,10 +62,9 @@ const history: History[] = [];
 const reports: Report[] = [];
 const followUps: FollowUp[] = [];
 const notifications: Notification[] = [];
-const audits: Audit[] = [];
 const announcements: Announcement[] = [];
 const favorites: { user: DemoUser; pet: Pet; ago: number }[] = [];
-const seq = { history: ID_RANGES.stageHistory[0], report: ID_RANGES.handoverReports[0], followUp: ID_RANGES.followUps[0], notification: ID_RANGES.notifications[0], audit: ID_RANGES.auditLogs[0], request: ID_RANGES.adoptionRequests[0] };
+const seq = { history: ID_RANGES.stageHistory[0], report: ID_RANGES.handoverReports[0], followUp: ID_RANGES.followUps[0], notification: ID_RANGES.notifications[0], request: ID_RANGES.adoptionRequests[0] };
 
 // ---------- น้อง 100 ตัว ----------
 const provinces = ["กรุงเทพมหานคร", "ปทุมธานี", "นนทบุรี", "สมุทรปราการ", "ชลบุรี", "เชียงใหม่", "ขอนแก่น", "นครราชสีมา", "ภูเก็ต", "สระบุรี", "กาญจนบุรี"];
@@ -151,7 +148,6 @@ function notify(recipient: DemoUser | null, kind: string, req: Req | null, ref: 
 function followUp(req: Req, kind: string, note: string, actor: DemoUser, ago: number) {
   const row = { id: seq.followUp++, req, kind, note, actor, ago: minutes(ago) };
   followUps.push(row);
-  audits.push({ id: seq.audit++, actor, action: `adoption.${kind.toLowerCase()}`, targetType: "adoption_request", target: String(req.id), changes: {}, reason: note, ago: row.ago });
   if (kind === "FLAG") req.followUpRequired = true;
   if (kind === "UNFLAG") req.followUpRequired = false;
   if (kind === "ESCALATE") { req.escalated = true; req.followUpRequired = true; }
@@ -383,22 +379,21 @@ for (const pet of pets) {
 }
 
 // ผลตรวจโพสต์ (เฉพาะน้องที่ไม่มีคำขอ — โพสต์ที่ซ่อนอยู่ไม่มีใครยื่นคำขอได้)
-const moderate = (pet: Pet, visibility: Pet["visibility"], reason: string, admin: DemoUser, ago: number, action: string) => {
+const moderate = (pet: Pet, visibility: Pet["visibility"], reason: string, admin: DemoUser, ago: number) => {
   pet.visibility = visibility; pet.moderationReason = reason; pet.moderatedBy = admin; pet.moderatedAgo = minutes(ago);
-  audits.push({ id: seq.audit++, actor: admin, action, targetType: "pet", target: String(pet.id), changes: { visibility: { to: visibility } }, reason, ago: minutes(ago) });
 };
-for (const [index, visibility, reason, action] of [
-  [94, "HIDDEN", "รายงานว่าโพสต์ซ้ำกับโพสต์อื่น", "pet.hide"],
-  [95, "HIDDEN", "ข้อมูลติดต่อในคำอธิบายไม่เหมาะสม", "pet.hide"],
-  [96, "CHANGES_REQUESTED", "รูปไม่ชัด กรุณาเพิ่มรูปน้องตัวจริง", "pet.request_changes"],
-  [97, "CHANGES_REQUESTED", "ข้อมูลวัคซีนไม่ครบ", "pet.request_changes"],
-  [98, "REVIEW", "เจ้าของแก้ไขแล้ว รอตรวจอีกครั้ง", "pet.request_changes"],
+for (const [index, visibility, reason] of [
+  [94, "HIDDEN", "รายงานว่าโพสต์ซ้ำกับโพสต์อื่น"],
+  [95, "HIDDEN", "ข้อมูลติดต่อในคำอธิบายไม่เหมาะสม"],
+  [96, "CHANGES_REQUESTED", "รูปไม่ชัด กรุณาเพิ่มรูปน้องตัวจริง"],
+  [97, "CHANGES_REQUESTED", "ข้อมูลวัคซีนไม่ครบ"],
+  [98, "REVIEW", "เจ้าของแก้ไขแล้ว รอตรวจอีกครั้ง"],
 ] as const) {
   const pet = pets[index];
-  moderate(pet, visibility, reason, admins[index % 2], pet.createdAgo - 2 * D, action);
+  moderate(pet, visibility, reason, admins[index % 2], pet.createdAgo - 2 * D);
 }
-moderate(pets[99], "HIDDEN", "ตรวจสอบรายงาน", admins[0], pets[99].createdAgo - 3 * D, "pet.hide");
-moderate(pets[99], "VISIBLE", "", admins[0], pets[99].createdAgo - 4 * D, "pet.show");
+moderate(pets[99], "HIDDEN", "ตรวจสอบรายงาน", admins[0], pets[99].createdAgo - 3 * D);
+moderate(pets[99], "VISIBLE", "", admins[0], pets[99].createdAgo - 4 * D);
 pets[99].moderationReason = "";
 
 // ---------- รายการโปรด ~150 ----------
@@ -434,16 +429,10 @@ const annRows: Omit<Announcement, "id" | "author">[] = [
 annRows.forEach((row, index) => {
   const ann: Announcement = { ...row, id: ID_RANGES.announcements[0] + index, author: admins[index % 2] };
   announcements.push(ann);
-  audits.push({ id: seq.audit++, actor: ann.author, action: "announcement.create", targetType: "announcement", target: String(ann.id), changes: { title: ann.title, status: "DRAFT" }, reason: "", ago: ann.createdAgo });
-  if (ann.publishedAgo !== null) audits.push({ id: seq.audit++, actor: ann.author, action: "announcement.publish", targetType: "announcement", target: String(ann.id), changes: {}, reason: "", ago: ann.publishedAgo });
 });
 // แจ้งเตือนประกาศ: เฉพาะประกาศที่ไม่ใช่ตัวอย่าง (เหมือน Backend) → ประกาศแรกถึงผู้ใช้ทุกคนที่ไม่ถูกระงับ
 for (const u of DEMO_DATASET_USERS.filter((x) => x.persona !== "suspended")) notify(u, "ANNOUNCEMENT_PUBLISHED", null, { announcement: announcements[0] }, announcements[0]);
 
-// ---------- บัญชีถูกระงับ + การแต่งตั้งผู้ดูแล (audit ของชุดทดสอบ) ----------
-const suspensionReason = "บัญชีทดสอบสำหรับสถานะถูกระงับ (ข้อมูลตัวอย่าง)";
-audits.push({ id: seq.audit++, actor: superAdmin, action: "user.suspend", targetType: "user", target: suspendedUser.email, changes: {}, reason: suspensionReason, ago: 8 * D });
-for (const admin of admins) audits.push({ id: seq.audit++, actor: superAdmin, action: "admin.set_role", targetType: "user", target: admin.email, changes: { role: { from: "USER", to: "ADMIN" } }, reason: "", ago: 60 * D });
 
 // ---------- ตรวจกฎก่อนเขียนไฟล์ (fail fast) ----------
 const fail = (message: string) => { throw new Error(`ชุดข้อมูลผิดกฎ: ${message}`); };
@@ -499,7 +488,7 @@ end $$;
 const setval = (table: string) => `select setval(pg_get_serial_sequence('public.${table}', 'id'), (select max(id) from public.${table}));\n`;
 
 const files: Record<string, string> = {};
-files["001-demo-profiles.sql"] = header("001-demo-profiles.sql", "profiles + ผู้ดูแลทดสอบ + บัญชีที่ถูกระงับ") + guard + `
+files["001-demo-profiles.sql"] = header("001-demo-profiles.sql", "profiles + ผู้ดูแลทดสอบ") + guard + `
 -- profile สร้างโดย trigger on_auth_user_created อยู่แล้ว · เผื่อกรณี trigger ไม่ทำงาน
 insert into public.profiles (id, name)
 select u.id, v.name from (values
@@ -514,10 +503,6 @@ ${values(DEMO_DATASET_USERS.filter((u) => u.role).map((u) => [q(u.email), q(u.ro
 ) as v(email, role, granted_by) join auth.users u on u.email = v.email left join auth.users g on g.email = v.granted_by
 on conflict (user_id) do nothing;
 
-insert into public.user_suspensions (user_id, reason, suspended_by)
-select u.id, ${q(suspensionReason)}, s.id from auth.users u, auth.users s
-where u.email = ${q(suspendedUser.email)} and s.email = ${q(superAdmin.email)}
-on conflict (user_id) do nothing;
 `;
 
 files["002-demo-pets.sql"] = header("002-demo-pets.sql", "น้อง 100 ตัว") + guard + `
@@ -637,28 +622,12 @@ cross join a
 on conflict do nothing;
 ` + setval("notification_events");
 
-files["010-demo-audit.sql"] = header("010-demo-audit.sql", "Audit log ของผู้ดูแลทดสอบ") + guard + needsAnchor + `
--- ติดป้าย changes.dataset = '${DATASET_ID}' ทุกแถว เพื่อแยกจากประวัติการดำเนินการจริง
--- admin_audit_logs เป็น append-only: สคริปต์ลบชุดข้อมูล (999) ลบแถวเหล่านี้ไม่ได้โดยออกแบบ
-${anchor}
-insert into public.admin_audit_logs (id, actor_id, actor_role, action, target_type, target_id, result, changes, reason, created_at)
-select v.id, u.id, coalesce(m.role, 'ADMIN'), v.action, v.target_type,
-  case when v.target_type = 'user' then coalesce((select id::text from auth.users where email = v.target), v.target) else v.target end,
-  'SUCCESS', v.changes::jsonb || jsonb_build_object('dataset', '${DATASET_ID}'), v.reason, ${at("m")}
-from (values
-${values(audits.map((x) => [String(x.id), email(x.actor), q(x.action), q(x.targetType), q(x.target), q(JSON.stringify(x.changes)), q(x.reason), String(x.ago)]))}
-) as v(id, actor_email, action, target_type, target, changes, reason, m)
-join auth.users u on u.email = v.actor_email
-left join public.admin_memberships m on m.user_id = u.id
-cross join a
-on conflict (id) do nothing;
-` + setval("admin_audit_logs");
 
 const inRange = (col: string, range: readonly [number, number]) => `${col} between ${range[0]} and ${range[1]}`;
 files["999-cleanup-demo.sql"] = header("999-cleanup-demo.sql", "ลบเฉพาะชุดข้อมูลทดสอบนี้") + guard + `
 -- ลบเฉพาะแถวในช่วง id ของชุดข้อมูลนี้ที่เป็นของบัญชี demo-*@pawhome.test (ไม่ใช้ TRUNCATE / ไม่ลบทั้งตาราง)
 -- คำขอ ไทม์ไลน์ รายงาน บันทึกติดตาม แจ้งเตือน รายการโปรด ถูกลบตาม FK (on delete cascade) ของน้อง/ประกาศ
--- ไม่ลบ: admin_audit_logs (append-only โดยออกแบบ — แยกด้วย changes.dataset) และบัญชีใน Supabase Auth (ลบผ่าน Dashboard/Admin API)
+-- ไม่ลบ: บัญชีใน Supabase Auth (ลบผ่าน Dashboard/Admin API)
 begin;
 delete from public.pets p using auth.users u
 where p.owner_id = u.id and u.email like 'demo-%@pawhome.test' and ${inRange("p.id", ID_RANGES.pets)};
@@ -666,7 +635,6 @@ delete from public.announcements where ${inRange("id", ID_RANGES.announcements)}
   and created_by in (select id from auth.users where email like 'demo-%@pawhome.test');
 delete from public.notification_events n using auth.users u
 where n.recipient_id = u.id and u.email like 'demo-%@pawhome.test' and ${inRange("n.id", ID_RANGES.notifications)};
-delete from public.user_suspensions s using auth.users u where s.user_id = u.id and u.email like 'demo-%@pawhome.test';
 delete from public.admin_memberships m using auth.users u where m.user_id = u.id and u.email like 'demo-%@pawhome.test';
 commit;
 `;
@@ -676,7 +644,6 @@ const count = <T>(rows: T[], f: (x: T) => boolean = () => true) => rows.filter(f
 const expected = {
   users: DEMO_DATASET_USERS.length,
   admins: count(DEMO_DATASET_USERS, (u) => Boolean(u.role)),
-  suspended: 1,
   pets: pets.length,
   petsByStatus: { AVAILABLE: count(pets, (p) => p.status === "AVAILABLE"), PENDING: count(pets, (p) => p.status === "PENDING"), ADOPTED: count(pets, (p) => p.status === "ADOPTED") },
   petsByVisibility: { VISIBLE: count(pets, (p) => p.visibility === "VISIBLE"), HIDDEN: count(pets, (p) => p.visibility === "HIDDEN"), CHANGES_REQUESTED: count(pets, (p) => p.visibility === "CHANGES_REQUESTED"), REVIEW: count(pets, (p) => p.visibility === "REVIEW") },
@@ -694,7 +661,6 @@ const expected = {
   announcements: announcements.length,
   notifications: notifications.length,
   unreadNotifications: count(notifications, (x) => x.readAgo === null && x.recipient !== null),
-  auditLogs: audits.length,
 };
 
 const outDir = new URL("../../database/seeds/", import.meta.url);
@@ -706,7 +672,6 @@ writeFileSync(new URL("manifest.json", outDir), `${JSON.stringify({ datasetId: D
 const rows: [string, string, string][] = [
   ["count: demo users", String(expected.users), "select count(*) from auth.users where email like 'demo-%@pawhome.test'"],
   ["count: demo admins", String(expected.admins), "select count(*) from public.admin_memberships m join auth.users u on u.id = m.user_id where u.email like 'demo-%@pawhome.test'"],
-  ["count: demo suspended", String(expected.suspended), "select count(*) from public.user_suspensions s join auth.users u on u.id = s.user_id where u.email like 'demo-%@pawhome.test'"],
   ["count: pets", String(expected.pets), `select count(*) from public.pets where ${inRange("id", ID_RANGES.pets)}`],
   ...Object.entries(expected.petsByStatus).map(([s, c]) => [`count: pets ${s}`, String(c), `select count(*) from public.pets where ${inRange("id", ID_RANGES.pets)} and status = '${s}'`] as [string, string, string]),
   ...Object.entries(expected.petsByVisibility).map(([s, c]) => [`count: pets visibility ${s}`, String(c), `select count(*) from public.pets where ${inRange("id", ID_RANGES.pets)} and visibility = '${s}'`] as [string, string, string]),
@@ -723,7 +688,6 @@ const rows: [string, string, string][] = [
   ["count: announcements", String(expected.announcements), `select count(*) from public.announcements where ${inRange("id", ID_RANGES.announcements)}`],
   ["count: notifications", String(expected.notifications), `select count(*) from public.notification_events where ${inRange("id", ID_RANGES.notifications)}`],
   ["count: unread notifications (personal)", String(expected.unreadNotifications), `select count(*) from public.notification_events where ${inRange("id", ID_RANGES.notifications)} and read_at is null and recipient_id is not null`],
-  ["count: audit logs (dataset)", String(expected.auditLogs), `select count(*) from public.admin_audit_logs where changes ->> 'dataset' = '${DATASET_ID}'`],
 ];
 const verifyCounts = rows.map(([name, value, sql]) => `  select ${q(name)}, ${q(value)}, (${sql})::text`).join("\n  union all\n");
 writeFileSync(new URL("../verification/verify-demo-data.sql", outDir), `-- =========================================================

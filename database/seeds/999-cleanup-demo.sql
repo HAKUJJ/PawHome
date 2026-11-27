@@ -18,7 +18,7 @@ end $$;
 
 -- ลบเฉพาะแถวในช่วง id ของชุดข้อมูลนี้ที่เป็นของบัญชี demo-*@pawhome.test (ไม่ใช้ TRUNCATE / ไม่ลบทั้งตาราง)
 -- คำขอ ไทม์ไลน์ รายงาน บันทึกติดตาม แจ้งเตือน รายการโปรด ถูกลบตาม FK (on delete cascade) ของน้อง/ประกาศ
--- ไม่ลบ: admin_audit_logs (append-only โดยออกแบบ — แยกด้วย changes.dataset) และบัญชีใน Supabase Auth (ลบผ่าน Dashboard/Admin API)
+-- ไม่ลบ: บัญชีใน Supabase Auth (ลบผ่าน Dashboard/Admin API)
 begin;
 delete from public.pets p using auth.users u
 where p.owner_id = u.id and u.email like 'demo-%@pawhome.test' and p.id between 2001 and 2100;
@@ -26,6 +26,5 @@ delete from public.announcements where id between 501 and 520 and is_demo in (tr
   and created_by in (select id from auth.users where email like 'demo-%@pawhome.test');
 delete from public.notification_events n using auth.users u
 where n.recipient_id = u.id and u.email like 'demo-%@pawhome.test' and n.id between 940001 and 949999;
-delete from public.user_suspensions s using auth.users u where s.user_id = u.id and u.email like 'demo-%@pawhome.test';
 delete from public.admin_memberships m using auth.users u where m.user_id = u.id and u.email like 'demo-%@pawhome.test';
 commit;

@@ -11,8 +11,6 @@ import { Announcements } from "./Content";
 import { Dashboard } from "./Dashboard";
 import { Users } from "./People";
 import { Pets } from "./Pets";
-import { Reports } from "./Reports";
-import { Settings } from "./Settings";
 import { clearAdmin, loadAdmin } from "./real";
 import { petOf, usePreview, userName } from "./store";
 import { Icon, matches, type IconName } from "./ui";
@@ -26,10 +24,6 @@ const navigation: { group: string; items: { path: string; label: string; icon: I
     { path: "adoptions", label: "คำขอรับเลี้ยง", icon: "heart" },
     { path: "users", label: "ผู้ใช้งาน", icon: "users" },
     { path: "announcements", label: "ประชาสัมพันธ์", icon: "megaphone" },
-  ] },
-  { group: "ระบบ", items: [
-    { path: "reports", label: "รายงาน", icon: "chart" },
-    { path: "settings", label: "ตั้งค่า", icon: "settings" },
   ] },
 ];
 const allItems = navigation.flatMap((section) => section.items);
@@ -126,7 +120,7 @@ function AdminLayout() {
     return () => { document.title = previous; };
   }, [page]);
 
-  return <div className={`ad ${data.preferences.density === "compact" ? "ad-compact" : ""}`}>
+  return <div className="ad">
     <a href="#admin-content" className="ad-skip">ข้ามไปยังเนื้อหา</a>
     <aside className="ad-sidebar"><Brand /><Navigation /></aside>
     <div className="ad-workspace">
@@ -141,11 +135,11 @@ function AdminLayout() {
           <button type="button" className="ad-search" aria-haspopup="dialog" aria-label="ค้นหา" onClick={() => { setQuery(""); setOpen("search"); }}>
             <Icon name="search" /><span>ค้นหาน้อง / เจ้าของ / เคส…</span>
           </button>
-          <Link to="/admin/settings" className="ad-profile" aria-label="ตั้งค่าโปรไฟล์ผู้ดูแล"><span className="ad-avatar" aria-hidden="true">{data.preferences.name.slice(0, 1)}</span><span>{data.preferences.name}{data.me?.role === "SUPER_ADMIN" ? " (ผู้ดูแลสูงสุด)" : ""}</span></Link>
+          <span className="ad-profile"><span className="ad-avatar" aria-hidden="true">{data.preferences.name.slice(0, 1)}</span><span>{data.preferences.name}{data.me?.role === "SUPER_ADMIN" ? " (ผู้ดูแลสูงสุด)" : ""}</span></span>
         </div>
       </header>
       <main id="admin-content" className="ad-main" tabIndex={-1}>
-        <p className="ad-env ad-env-real"><strong>ข้อมูลจริง</strong>ทุกการกระทำมีผลกับเว็บไซต์ PawHome และถูกบันทึกใน Audit Log</p>
+        <p className="ad-env ad-env-real"><strong>ข้อมูลจริง</strong>ทุกการกระทำมีผลกับเว็บไซต์ PawHome ทันที</p>
         <Routes>
           <Route index element={<Dashboard />} />
           <Route path="pets" element={<Pets />} />
@@ -153,8 +147,6 @@ function AdminLayout() {
           <Route path="adoptions/:id" element={<CaseDetail />} />
           <Route path="users" element={<Users />} />
           <Route path="announcements" element={<Announcements />} />
-          <Route path="reports" element={<Reports />} />
-          <Route path="settings" element={<Settings />} />
           <Route path="*" element={<section className="ad-card"><h1 className="ad-sr">ไม่พบหน้า</h1><p>ไม่พบหน้าผู้ดูแลนี้</p><Link className="ad-btn-link" to="/admin">กลับหน้าภาพรวม</Link></section>} />
         </Routes>
       </main>

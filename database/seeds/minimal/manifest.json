@@ -17,11 +17,10 @@
     "stageHistory": [960001, 960999],
     "handoverReports": [961001, 961999],
     "followUps": [962001, 962999],
-    "notifications": [963001, 963999],
-    "auditLogs": [964001, 964999]
+    "notifications": [963001, 963999]
   },
   "expected": {
     "users": 6, "pets": 10, "adoptionRequests": 12, "favorites": 8, "timelineEvents": 36, "handoverReports": 6,
-    "followUpRecords": 4, "followUpCases": 3, "announcements": 3, "notifications": 16, "auditLogs": 10
+    "followUpRecords": 4, "followUpCases": 3, "announcements": 3, "notifications": 16
   }
 }

@@ -214,24 +214,6 @@ from (values
 cross join (select last_activity_at from public.adoption_requests where id = 3509) r
 on conflict do nothing;
 
--- ---------- Audit log ของผู้ดูแลเดโม่ (ติดป้าย dataset · append-only) ----------
-insert into public.admin_audit_logs (id, actor_id, actor_role, action, target_type, target_id, result, changes, reason, created_at)
-select v.id, a.id, 'SUPER_ADMIN', v.action, v.target_type, v.target_id, 'SUCCESS',
-  jsonb_build_object('dataset', 'pawhome-demo-minimal-v1'), v.reason, now() - v.ago
-from (values
-  (964001, 'announcement.create', 'announcement', '601', '', interval '20 days 1 hour'),
-  (964002, 'announcement.publish', 'announcement', '601', '', interval '20 days'),
-  (964003, 'announcement.create', 'announcement', '602', '', interval '18 days 1 hour'),
-  (964004, 'announcement.publish', 'announcement', '602', '', interval '18 days'),
-  (964005, 'announcement.create', 'announcement', '603', '', interval '16 days 1 hour'),
-  (964006, 'announcement.publish', 'announcement', '603', '', interval '16 days'),
-  (964007, 'adoption.note', 'adoption_request', '3510', 'รอหลักฐาน: ขอรูปวันส่งมอบจากทั้งสองฝ่าย', interval '24 hours'),
-  (964008, 'adoption.close', 'adoption_request', '3512', 'ผู้ขอยกเลิกแล้ว ปิดเคส', interval '72 hours'),
-  (964009, 'adoption.contact', 'adoption_request', '3509', 'โทรหาเจ้าของแล้ว ไม่รับสาย จะโทรอีกครั้งพรุ่งนี้', interval '3 hours'),
-  (964010, 'adoption.flag', 'adoption_request', '3509', '', interval '2 hours')
-) as v(id, action, target_type, target_id, reason, ago)
-cross join (select id from mini_u where k = 'mini-01') a
-on conflict (id) do nothing;
 
 -- sequence ไม่ต่ำกว่าค่าที่ใช้แล้ว (แถวใหม่จากหน้าเว็บจะไม่ชน id ของชุดนี้)
 select setval(pg_get_serial_sequence('public.pets', 'id'), (select max(id) from public.pets));
@@ -241,6 +223,5 @@ select setval(pg_get_serial_sequence('public.adoption_stage_history', 'id'), (se
 select setval(pg_get_serial_sequence('public.adoption_handover_reports', 'id'), (select max(id) from public.adoption_handover_reports));
 select setval(pg_get_serial_sequence('public.adoption_follow_ups', 'id'), (select max(id) from public.adoption_follow_ups));
 select setval(pg_get_serial_sequence('public.notification_events', 'id'), (select max(id) from public.notification_events));
-select setval(pg_get_serial_sequence('public.admin_audit_logs', 'id'), (select max(id) from public.admin_audit_logs));
 
 commit;

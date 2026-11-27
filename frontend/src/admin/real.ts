@@ -1,7 +1,7 @@
 // Real Admin Mode: โหลด / เปลี่ยนข้อมูลผ่าน Backend แล้วเขียนลง store เดิม
 // ยืนยันสิทธิ์ด้วย GET /admin/me ก่อนโหลดข้อมูลอื่นทุกครั้ง · ไม่เคยใช้ role ที่เก็บในเบราว์เซอร์
 import { ApiError } from "../api/client";
-import { adminApi, caseKey, caseNumber, toAnnouncement, toAudit, toCase, toEvent, toPet, toUser } from "./api";
+import { adminApi, caseKey, caseNumber, toAnnouncement, toCase, toEvent, toPet, toUser } from "./api";
 import { usePreview, type AdminStatus } from "./store";
 import { toast } from "../stores/useToastStore";
 import { notify } from "./ui";
@@ -9,7 +9,7 @@ import { notify } from "./ui";
 const fail = (message: string) => toast(message, "error");
 import type { CaseAction } from "./workflow";
 
-const empty = { users: [], pets: [], cases: [], announcements: [], logs: [], me: undefined };
+const empty = { users: [], pets: [], cases: [], announcements: [], me: undefined };
 
 function statusOf(error: unknown): { status: AdminStatus; error: string } {
   if (error instanceof ApiError && error.status === 401) return { status: "unauthorized", error: error.message };
@@ -22,24 +22,18 @@ export async function loadAdmin({ silent = false } = {}) {
   if (!silent) usePreview.setState({ ...empty, status: "checking", error: undefined });
   try {
     const me = await adminApi.me();
-    const [pets, cases, users, announcements, audit] = await Promise.all([
-      adminApi.pets(), adminApi.cases(), adminApi.users(), adminApi.announcements(), adminApi.auditLogs(),
+    const [pets, cases, users, announcements] = await Promise.all([
+      adminApi.pets(), adminApi.cases(), adminApi.users(), adminApi.announcements(),
     ]);
     const state = usePreview.getState();
     // เก็บไทม์ไลน์ที่โหลดไว้แล้ว (โหลดทีละเคสตอนเปิดหน้ารายละเอียด)
     const timelines = new Map(state.cases.map((item) => [item.id, item.timeline]));
-    const names = {
-      pets: new Map(pets.map((p) => [String(p.id), p.name])),
-      users: new Map(users.map((u) => [u.id, u.name])),
-      announcements: new Map(announcements.map((a) => [String(a.id), a.title])),
-    };
     usePreview.setState({
       me, status: "ready", error: undefined,
       pets: pets.map(toPet),
       cases: cases.map((c) => toCase(c, timelines.get(caseKey(c.id)) ?? [])),
       users: users.map(toUser),
       announcements: announcements.map(toAnnouncement),
-      logs: audit.items.map((entry) => toAudit(entry, names)),
       preferences: { ...state.preferences, name: me.name },
     });
   } catch (error) {
@@ -85,9 +79,7 @@ export async function realCaseAction(key: string, action: CaseAction, success: s
     switch (action.type) {
       case "flag": return adminApi.followUp(id, "FLAG");
       case "unflag": return adminApi.followUp(id, "UNFLAG");
-      case "contact": return adminApi.followUp(id, "CONTACT", action.note);
       case "note": return adminApi.followUp(id, "NOTE", action.note);
-      case "escalate": return adminApi.escalate(id);
       case "markDisputed": return adminApi.reviewHandover(id, "MARK_DISPUTED", "ผู้ดูแลทำเครื่องหมายข้อพิพาทจากหน้ารายละเอียดเคส");
       case "verify": return adminApi.reviewHandover(id, item?.stage === "COMPLETED" ? "VERIFY" : "COMPLETE", action.note);
       case "legacyComplete": return adminApi.reviewHandover(id, "COMPLETE", action.note);

@@ -5,7 +5,7 @@
 // =========================================================
 import { request } from "../api/client";
 import type { Sex, Species } from "../types/pet";
-import type { Announcement, Audit, PreviewPet, PreviewUser, Visibility } from "./store";
+import type { Announcement, PreviewPet, PreviewUser, Visibility } from "./store";
 import type { AdoptionCase, CaseEvent, Handover, Stage } from "./workflow";
 
 // ---------- รูปแบบจาก Backend (ตรงกับ backend/src/types/admin.ts) ----------
@@ -24,16 +24,15 @@ interface ApiReport { party: "OWNER" | "APPLICANT"; handoverDate: string; outcom
 export interface ApiCase {
   id: number; petId: number; applicantId: string; applicantName: string; ownerId: string; ownerName: string; phone: string;
   housing: "HOUSE" | "CONDO" | "DORM"; message: string; stage: Stage; createdAt: string; lastActivityAt: string;
-  followUpRequired: boolean; escalated: boolean; disputed: boolean; legacyReview: boolean; closedAt: string | null;
+  followUpRequired: boolean; disputed: boolean; legacyReview: boolean; closedAt: string | null;
   completedAt: string | null; verifiedAt: string | null; resolution: string;
   reports: { owner: ApiReport | null; applicant: ApiReport | null }; confirmations: { owner: boolean; applicant: boolean };
 }
-export interface ApiUser { id: string; name: string; role: "USER" | "ADMIN" | "SUPER_ADMIN"; suspended: boolean; suspendedReason: string; joinedAt: string }
+export interface ApiUser { id: string; name: string; role: "USER" | "ADMIN" | "SUPER_ADMIN"; joinedAt: string }
 export interface ApiAnnouncement {
   id: number; title: string; category: string; description: string; eventDate: string | null; eventTime: string; location: string;
   contact: string; cta: string; destination: string; imageUrl: string; status: "DRAFT" | "PUBLISHED"; displayOrder: number; isDemo: boolean;
 }
-export interface ApiAudit { id: string; actorName: string; action: string; targetType: string; targetId: string; reason: string; createdAt: string }
 interface ApiEvent { at: string; kind: string; actorRole: string; actorName: string; label: string; note: string }
 
 // ---------- แปลงเป็นรูปแบบของหน้าจอ ----------
@@ -62,7 +61,7 @@ export const toCase = (c: ApiCase, timeline: CaseEvent[] = []): AdoptionCase => 
   id: caseKey(c.id), petId: c.petId, applicantId: c.applicantId, stage: c.stage, createdAt: ms(c.createdAt), activityAt: ms(c.lastActivityAt),
   contact: c.phone, message: c.message, housing: housing[c.housing] ?? c.housing,
   // ข้อมูลระบบเดิมที่รอตรวจ ต้องอยู่ในคิวติดตามเสมอ
-  flagged: c.followUpRequired || c.legacyReview, disputed: c.disputed, escalated: c.escalated, closed: Boolean(c.closedAt),
+  flagged: c.followUpRequired || c.legacyReview, disputed: c.disputed, closed: Boolean(c.closedAt),
   verified: Boolean(c.verifiedAt), resolution: c.resolution || undefined, completedAt: c.completedAt ? ms(c.completedAt) : undefined,
   legacy: c.legacyReview,
   reports: { owner: toHandover(c.reports.owner), applicant: toHandover(c.reports.applicant) },
@@ -71,7 +70,7 @@ export const toCase = (c: ApiCase, timeline: CaseEvent[] = []): AdoptionCase => 
 });
 
 export const toUser = (u: ApiUser): PreviewUser => ({
-  id: u.id, name: u.name, role: u.role === "USER" ? "member" : "admin", suspended: u.suspended, joinedAt: ms(u.joinedAt), province: "–",
+  id: u.id, name: u.name, role: u.role === "USER" ? "member" : "admin", joinedAt: ms(u.joinedAt), province: "–",
 });
 
 export const toAnnouncement = (a: ApiAnnouncement): Announcement => ({
@@ -79,29 +78,6 @@ export const toAnnouncement = (a: ApiAnnouncement): Announcement => ({
   location: a.location, contact: a.contact, cta: a.cta, destination: a.destination, published: a.status === "PUBLISHED", order: a.displayOrder,
 });
 
-const actionLabel: Record<string, string> = {
-  "pet.approve": "อนุมัติโพสต์", "pet.request_changes": "ส่งโพสต์กลับไปแก้ไข", "pet.hide": "ซ่อนโพสต์", "pet.show": "แสดงโพสต์",
-  "adoption.flag": "ตั้งธงต้องติดตาม", "adoption.unflag": "นำธงต้องติดตามออก", "adoption.contact": "บันทึกการติดต่อ", "adoption.note": "เพิ่มบันทึกติดตาม",
-  "adoption.escalate": "ส่งต่อเคสเร่งด่วน", "adoption.resolve": "ติดตามเสร็จแล้ว", "adoption.dispute": "ทำเครื่องหมายข้อพิพาท",
-  "adoption.verify": "ยืนยันผลตรวจสอบ", "adoption.reopen": "เปิดเคสให้ดำเนินการต่อ", "adoption.close": "ปิดเคส",
-  "user.suspend": "ระงับบัญชี", "user.unsuspend": "เปิดใช้งานบัญชี", "admin.set_role": "เปลี่ยนสิทธิ์ผู้ดูแล", "admin.revoke": "ถอดสิทธิ์ผู้ดูแล",
-  "admin.bootstrap_super_admin": "แต่งตั้งผู้ดูแลสูงสุดคนแรก",
-  "announcement.create": "สร้างประกาศ", "announcement.update": "แก้ไขประกาศ", "announcement.publish": "เผยแพร่ประกาศ",
-  "announcement.unpublish": "ยกเลิกการเผยแพร่", "announcement.delete": "ลบประกาศ", "permission.denied": "พยายามทำเกินสิทธิ์",
-};
-const category: Record<string, Audit["category"]> = { adoption_request: "เคส", pet: "สัตว์เลี้ยง", user: "ผู้ใช้", announcement: "ประกาศ" };
-
-export function toAudit(entry: ApiAudit, names: { pets: Map<string, string>; users: Map<string, string>; announcements: Map<string, string> }): Audit {
-  const target = entry.targetType === "adoption_request" ? caseKey(Number(entry.targetId))
-    : entry.targetType === "pet" ? names.pets.get(entry.targetId) ?? `โพสต์ #${entry.targetId}`
-    : entry.targetType === "user" ? names.users.get(entry.targetId) ?? "ผู้ใช้"
-    : entry.targetType === "announcement" ? names.announcements.get(entry.targetId) ?? `ประกาศ #${entry.targetId}`
-    : entry.targetId || entry.targetType;
-  return {
-    id: entry.id, actor: entry.actorName, action: actionLabel[entry.action] ?? entry.action, target, at: ms(entry.createdAt),
-    category: category[entry.targetType] ?? "ระบบ", note: entry.reason || undefined,
-  };
-}
 
 const actor = (role: string): CaseEvent["actor"] => (role === "OWNER" ? "owner" : role === "APPLICANT" ? "applicant" : "admin");
 export const toEvent = (e: ApiEvent): CaseEvent => ({ actor: actor(e.actorRole), label: e.label, at: ms(e.at), note: e.note || undefined });
@@ -126,20 +102,16 @@ export const adminApi = {
   cases: () => all<ApiCase>("/admin/adoptions"),
   users: () => all<ApiUser>("/admin/users"),
   announcements: () => request<ApiAnnouncement[]>("/admin/announcements"),
-  auditLogs: (limit = 50) => request<Paged<ApiAudit>>(`/admin/audit-logs?limit=${limit}`),
   timeline: (id: number) => request<ApiEvent[]>(`/admin/adoptions/${id}/timeline`),
 
   moderatePet: (id: number, decision: "APPROVE" | "REQUEST_CHANGES", reason = "") => request(`/admin/pets/${id}/moderation`, json("POST", { decision, reason })),
   setPetVisibility: (id: number, value: "VISIBLE" | "HIDDEN", reason = "") => request(`/admin/pets/${id}`, json("PATCH", { visibility: value, reason })),
 
   followUp: (id: number, kind: "FLAG" | "UNFLAG" | "CONTACT" | "NOTE" | "RESOLVE", note = "") => request(`/admin/adoptions/${id}/follow-ups`, json("POST", { kind, note })),
-  escalate: (id: number, note = "") => request(`/admin/adoptions/${id}/escalate`, json("POST", { note })),
   reviewHandover: (id: number, decision: "COMPLETE" | "VERIFY" | "MARK_DISPUTED" | "REOPEN", note: string) =>
     request(`/admin/adoptions/${id}/review-handover`, json("POST", { decision, note })),
   closeCase: (id: number, note = "") => request(`/admin/adoptions/${id}/close`, json("POST", { note })),
 
-  suspend: (id: string, reason: string) => request(`/admin/users/${id}/suspension`, json("POST", { reason })),
-  unsuspend: (id: string) => request(`/admin/users/${id}/suspension`, { method: "DELETE" }),
 
   createAnnouncement: (a: Announcement) => request(`/admin/announcements`, json("POST", fromAnnouncement(a))),
   updateAnnouncement: (id: string, patch: Partial<ReturnType<typeof fromAnnouncement>>) => request(`/admin/announcements/${id}`, json("PATCH", patch)),

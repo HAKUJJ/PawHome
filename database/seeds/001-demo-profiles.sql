@@ -1,5 +1,5 @@
 -- =========================================================
--- PawHome demo dataset pawhome-demo-v1 (v1.0.0) — profiles + ผู้ดูแลทดสอบ + บัญชีที่ถูกระงับ
+-- PawHome demo dataset pawhome-demo-v1 (v1.0.0) — profiles + ผู้ดูแลทดสอบ
 -- สร้างโดย backend/scripts/generate-demo-seed.ts (ห้ามแก้มือ: แก้ generator แล้วรันใหม่)
 -- ข้อมูลสมมติทั้งหมด · ใช้กับ Local / PGlite / Supabase Development-Test เท่านั้น · ห้าม Production
 -- รันซ้ำได้: ทุก insert ใช้ id ในช่วงของชุดข้อมูลนี้ + on conflict do nothing · ไม่ลบหรือแก้ข้อมูลอื่น
@@ -71,7 +71,3 @@ select u.id, v.role, g.id from (values
 ) as v(email, role, granted_by) join auth.users u on u.email = v.email left join auth.users g on g.email = v.granted_by
 on conflict (user_id) do nothing;
 
-insert into public.user_suspensions (user_id, reason, suspended_by)
-select u.id, 'บัญชีทดสอบสำหรับสถานะถูกระงับ (ข้อมูลตัวอย่าง)', s.id from auth.users u, auth.users s
-where u.email = 'demo-39.suspended.x@pawhome.test' and s.email = 'demo-01.superadmin@pawhome.test'
-on conflict (user_id) do nothing;

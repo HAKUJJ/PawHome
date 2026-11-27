@@ -7,7 +7,6 @@
   display: grid; grid-template-columns: 16rem minmax(0, 1fr); min-height: 100dvh; color: var(--color-ink);
   /* แถบขาวของ sidebar ยาวตลอดหน้า แม้เนื้อหายาวกว่าจอ */
   background: linear-gradient(to right, #fff calc(16rem - 1px), var(--color-line) calc(16rem - 1px) 16rem, var(--color-ground) 16rem); }
-.ad.ad-compact { --pad: .9rem; }
 .ad :is(h1, h2, h3) { font-family: var(--font-display); line-height: 1.35; }
 .ad :is(p, h1, h2, h3, td, dd, li, span) { overflow-wrap: anywhere; }
 .ad button { cursor: pointer; }
@@ -131,7 +130,6 @@ a.ad-stat:hover { border-color: var(--color-navy); }
 .ad-table-wrap:focus-visible { outline: 2px solid var(--color-navy); outline-offset: 2px; }
 .ad-table-wrap table { width: 100%; min-width: 46rem; border-collapse: collapse; font-size: .92rem; }
 .ad-table-wrap :is(th, td) { padding: .65rem .8rem; text-align: start; vertical-align: middle; border-bottom: 1px solid var(--color-line); }
-.ad-compact .ad-table-wrap :is(th, td) { padding-block: .4rem; }
 .ad-table-wrap th { background: var(--soft); color: var(--color-muted); font-size: .82rem; font-weight: 600; white-space: nowrap; }
 .ad-table-wrap tr:last-child td { border-bottom: 0; }
 .ad-table-wrap tbody tr:hover { background: #fbf9f6; }

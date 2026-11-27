@@ -64,7 +64,8 @@ begin
   begin select count(*) into n from public.adoption_follow_ups; outcome := n::text;
   exception when insufficient_privilege then outcome := 'blocked'; end;
   insert into rls_demo_results values ('stranger: admin follow-up notes', 'blocked', outcome);
-  begin select count(*) into n from public.admin_audit_logs; outcome := n::text;
+  begin if to_regclass('public.admin_audit_logs') is null then raise insufficient_privilege; end if; -- ลบแล้วใน 004
+    select count(*) into n from public.admin_audit_logs; outcome := n::text;
   exception when insufficient_privilege then outcome := 'blocked'; end;
   insert into rls_demo_results values ('stranger: audit logs', 'blocked', outcome);
   begin
@@ -110,7 +111,7 @@ with checks(check_name, expected, actual) as (
   from pg_class c join pg_namespace s on s.oid = c.relnamespace where s.nspname = 'public' and c.relkind = 'r'
   union all select 'policy exists: ' || p, 'true', exists (select 1 from pg_policies where schemaname = 'public' and policyname = p)::text
   from unnest(array['pets: read visible or own', 'adoptions: read own or pet owner', 'notification_events: own', 'announcements: read published',
-                    'handover_reports: participants', 'stage_history: participants', 'admin_memberships: read own', 'user_suspensions: read own']) p
+                    'handover_reports: participants', 'stage_history: participants', 'admin_memberships: read own']) p
 )
 select check_name, expected, actual, expected = actual as ok
 from checks

@@ -27,7 +27,7 @@ const seed = async (db: PGlite) => { for (const file of manifest.runOrder) await
 const verify = async (db: PGlite, file: string) => (await db.exec(read(`../../database/verification/${file}`))).at(-1)!.rows as Check[];
 
 const TABLES = ["profiles", "pets", "favorites", "adoption_requests", "adoption_stage_history", "adoption_handover_reports",
-  "adoption_follow_ups", "announcements", "notification_events", "admin_audit_logs", "admin_memberships", "user_suspensions"];
+  "adoption_follow_ups", "announcements", "notification_events", "admin_memberships"];
 async function counts(db: PGlite) {
   const out: Record<string, number> = {};
   for (const t of TABLES) out[t] = (await db.query<{ n: number }>(`select count(*)::int n from public.${t}`)).rows[0].n;
@@ -46,13 +46,12 @@ describe("demo dataset seed", async () => {
   });
 
   it("creates the dataset described in manifest.json", () => {
-    const e = manifest.expected as { pets: number; requests: number; favorites: number; announcements: number; notifications: number; auditLogs: number; timelineEvents: number };
+    const e = manifest.expected as { pets: number; requests: number; favorites: number; announcements: number; notifications: number; timelineEvents: number };
     expect(first.pets).toBe(e.pets);
     expect(first.adoption_requests).toBe(e.requests);
     expect(first.favorites).toBe(e.favorites);
     expect(first.announcements).toBe(e.announcements);
     expect(first.notification_events).toBe(e.notifications);
-    expect(first.admin_audit_logs).toBe(e.auditLogs);
     expect(first.adoption_stage_history).toBe(e.timelineEvents);
     expect(first.profiles).toBe(DEMO_DATASET_USERS.length);
   });
@@ -65,13 +64,12 @@ describe("demo dataset seed", async () => {
     });
   }
 
-  it("cleanup removes only this dataset (audit log stays, append-only) and the seed can run again", async () => {
+  it("cleanup removes only this dataset and the seed can run again", async () => {
     // ข้อมูลที่ไม่ใช่ของชุดนี้ต้องไม่ถูกลบ
     await db.exec(`insert into public.announcements (title, status) values ('ประกาศอื่นที่ไม่ใช่ชุดทดสอบ', 'DRAFT')`);
     await db.exec(read("../../database/seeds/999-cleanup-demo.sql"));
     const after = await counts(db);
-    expect(after).toMatchObject({ pets: 0, adoption_requests: 0, favorites: 0, adoption_stage_history: 0, notification_events: 0, admin_memberships: 0, user_suspensions: 0, announcements: 1 });
-    expect(after.admin_audit_logs).toBe(first.admin_audit_logs);
+    expect(after).toMatchObject({ pets: 0, adoption_requests: 0, favorites: 0, adoption_stage_history: 0, notification_events: 0, admin_memberships: 0, announcements: 1 });
     expect(after.profiles).toBe(first.profiles); // บัญชีลบผ่าน Supabase Auth เท่านั้น
     await seed(db);
     expect((await counts(db)).adoption_requests).toBe(first.adoption_requests);

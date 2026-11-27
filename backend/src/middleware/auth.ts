@@ -6,15 +6,14 @@ import { ApiError } from "./error.js";
 
 const bearer = (header: string | undefined) => (header?.startsWith("Bearer ") ? header.slice(7).trim() : "");
 
-// ยืนยัน token กับ Supabase Auth แล้วโหลด profile · บัญชีที่ถูกผู้ดูแลระงับใช้งานไม่ได้
+// ยืนยัน token กับ Supabase Auth แล้วโหลด profile
 // shortcut: getUser() ยิงไป Supabase ทุก request, ถ้าโหลดสูงเปลี่ยนเป็น auth.getClaims() ที่ตรวจ JWT ในเครื่องด้วย JWKS
 async function authenticate(token: string, res: Response) {
   const { data, error } = await supabaseAdmin.auth.getUser(token);
   if (error || !data.user) throw new ApiError(401, "เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่");
 
-  const profile = await profilesRepository.findWithSuspension(data.user.id);
+  const profile = await profilesRepository.findById(data.user.id);
   if (!profile) throw new ApiError(401, "ไม่พบข้อมูลผู้ใช้ กรุณาเข้าสู่ระบบใหม่");
-  if (profile.suspension) throw new ApiError(403, "บัญชีนี้ถูกระงับการใช้งาน หากคิดว่าผิดพลาดกรุณาติดต่อทีมงาน");
 
   res.locals.user = { id: profile.id, name: profile.name, email: data.user.email ?? "" } satisfies User;
   res.locals.token = token;

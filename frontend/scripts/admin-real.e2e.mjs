@@ -99,15 +99,15 @@ await step("legacy case: admin confirms handover with a reason → COMPLETED in 
   await page.getByText("ผู้ดูแลยืนยันผลตรวจสอบ · รับเลี้ยงสำเร็จ").waitFor();
 });
 
-await step("follow-up: contact note is saved on the server and shown in notes", async () => {
+await step("follow-up: note is saved on the server and shown in notes", async () => {
   await page.goto(`${base}/admin/adoptions/AD-2`);
   const before = (await api("/admin/adoptions/2", { token: adminToken })).body.lastActivityAt;
-  await page.getByRole("button", { name: "บันทึกการติดต่อ" }).click();
+  await page.getByRole("button", { name: "เพิ่มบันทึกติดตาม" }).click();
   await page.getByRole("dialog").getByLabel("รายละเอียด").fill("โทรติดตามแล้ว (E2E)");
   await page.getByRole("dialog").getByRole("button", { name: "บันทึก" }).click();
   await page.getByRole("link", { name: "บันทึกติดตาม" }).click();
   await page.getByText("“โทรติดตามแล้ว (E2E)”").waitFor();
-  assert.equal((await api("/admin/adoptions/2", { token: adminToken })).body.lastActivityAt, before, "contact must not reset the owner's clock");
+  assert.equal((await api("/admin/adoptions/2", { token: adminToken })).body.lastActivityAt, before, "a note must not reset the owner's clock");
 });
 
 await step("pets: hide a post → gone from the public API", async () => {
@@ -122,19 +122,16 @@ await step("pets: hide a post → gone from the public API", async () => {
   assert.equal(await page.getByRole("button", { name: "ลบโพสต์" }).count(), 0, "Real Mode has no delete");
 });
 
-await step("users: suspend requires a reason → user is blocked by the API", async () => {
+await step("users: read-only overview (posts + requests, no suspension)", async () => {
   await page.keyboard.press("Escape");
   await page.goto(`${base}/admin/users`);
   await page.getByLabel("ค้นหาผู้ใช้").fill("ปอง");
   await page.getByRole("button", { name: "ดูบัญชี ปอง" }).click();
-  await page.getByRole("button", { name: "ระงับบัญชี" }).click();
-  const dialog = page.getByRole("dialog", { name: "ระงับบัญชี ปอง" });
-  assert.equal(await dialog.getByRole("button", { name: "ระงับบัญชี" }).isDisabled(), true);
-  await dialog.getByLabel(/เหตุผลที่ระงับ/).fill("ทดสอบการระงับบัญชี (E2E)");
-  await dialog.getByRole("button", { name: "ระงับบัญชี" }).click();
-  await page.getByText("ระงับบัญชีแล้ว").first().waitFor();
+  await page.getByRole("heading", { name: /^โพสต์ \(/ }).waitFor();
+  await page.getByRole("heading", { name: /^ประวัติคำขอรับเลี้ยง/ }).waitFor();
+  assert.equal(await page.getByRole("button", { name: "ระงับบัญชี" }).count(), 0);
   const pong = await tokenOf("pong@pawhome.test");
-  assert.equal((await api("/me/pets", { token: pong })).status, 403);
+  assert.equal((await api("/me/pets", { token: pong })).status, 200);
 });
 
 await step("announcements: create + publish → visible on the public API", async () => {
@@ -152,10 +149,17 @@ await step("announcements: create + publish → visible on the public API", asyn
   assert.ok(published.some((a) => a.title === "ประกาศ E2E" && a.destination === "/pets"));
 });
 
-await step("dashboard recent activity comes from the audit log", async () => {
+await step("admin menu has only the five pages (no reports / settings / audit)", async () => {
   await page.goto(`${base}/admin`);
   await h1(page, "ภาพรวม");
-  await page.getByText("ระงับบัญชี (ปอง)", { exact: false }).first().waitFor();
+  const nav = page.locator(".ad-sidebar");
+  for (const label of ["ภาพรวม", "จัดการสัตว์เลี้ยง", "คำขอรับเลี้ยง", "ผู้ใช้งาน", "ประชาสัมพันธ์"]) await nav.getByRole("link", { name: label }).waitFor();
+  assert.equal(await nav.getByRole("link", { name: /รายงาน|ตั้งค่า/ }).count(), 0);
+  assert.equal(await page.getByText("กิจกรรมผู้ใช้ล่าสุด").count(), 0);
+  await page.goto(`${base}/admin/reports`);
+  await page.getByText("ไม่พบหน้าผู้ดูแลนี้").waitFor();
+  await page.goto(`${base}/admin`);
+  await h1(page, "ภาพรวม");
 });
 
 await step("expired/invalid access token → refreshed automatically, admin stays signed in", async () => {

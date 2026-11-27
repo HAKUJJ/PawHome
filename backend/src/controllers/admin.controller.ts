@@ -7,9 +7,8 @@ import { adminAdoptionsService } from "../services/admin-adoptions.service.js";
 import { adminService } from "../services/admin.service.js";
 import { announcementsService } from "../services/announcements.service.js";
 import {
-  adminRoleSchema, announcementCreateSchema, announcementUpdateSchema, auditFiltersSchema, caseFiltersSchema, closeSchema,
-  escalateSchema, followUpSchema, moderationSchema, petFiltersAdminSchema, petVisibilitySchema, reportRangeSchema,
-  reviewHandoverSchema, suspendSchema, userFiltersSchema,
+  announcementCreateSchema, announcementUpdateSchema, caseFiltersSchema, closeSchema, followUpSchema, moderationSchema,
+  petFiltersAdminSchema, petVisibilitySchema, reviewHandoverSchema, userFiltersSchema,
 } from "../validators/admin.validator.js";
 import { parseId } from "../validators/common.validator.js";
 
@@ -64,10 +63,6 @@ export const adminController = {
     const id = caseId(req.params.id);
     res.status(201).json(await adminAdoptionsService.followUp(currentAdmin(res), id, followUpSchema.parse(req.body)));
   }) satisfies Handler,
-  escalate: (async (req, res) => {
-    const id = caseId(req.params.id);
-    res.json(await adminAdoptionsService.escalate(currentAdmin(res), id, escalateSchema.parse(req.body).note));
-  }) satisfies Handler,
   reviewHandover: (async (req, res) => {
     const id = caseId(req.params.id);
     res.json(await adminAdoptionsService.reviewHandover(currentAdmin(res), id, reviewHandoverSchema.parse(req.body)));
@@ -84,27 +79,6 @@ export const adminController = {
   getUser: (async (req, res) => {
     res.json(await adminService.getUser(userId(req.params.id)));
   }) satisfies Handler,
-  suspendUser: (async (req, res) => {
-    const id = userId(req.params.id);
-    res.json(await adminService.suspendUser(currentAdmin(res), id, suspendSchema.parse(req.body).reason));
-  }) satisfies Handler,
-  unsuspendUser: (async (req, res) => {
-    res.json(await adminService.unsuspendUser(currentAdmin(res), userId(req.params.id)));
-  }) satisfies Handler,
-
-  // ---- สิทธิ์ผู้ดูแล ----
-  listAdmins: (async (_req, res) => {
-    res.json(await adminService.listAdmins());
-  }) satisfies Handler,
-  setAdminRole: (async (req, res) => {
-    const id = userId(req.params.userId);
-    res.json(await adminService.setAdminRole(currentAdmin(res), id, adminRoleSchema.parse(req.body).role));
-  }) satisfies Handler,
-  revokeAdmin: (async (req, res) => {
-    await adminService.revokeAdmin(currentAdmin(res), userId(req.params.userId));
-    res.status(204).end();
-  }) satisfies Handler,
-
   // ---- ประกาศ ----
   listAnnouncements: (async (_req, res) => {
     res.json(await announcementsService.listAll());
@@ -117,15 +91,8 @@ export const adminController = {
     res.json(await announcementsService.update(currentAdmin(res), id, announcementUpdateSchema.parse(req.body)));
   }) satisfies Handler,
   deleteAnnouncement: (async (req, res) => {
-    await announcementsService.remove(currentAdmin(res), announcementId(req.params.id));
+    await announcementsService.remove(announcementId(req.params.id));
     res.status(204).end();
   }) satisfies Handler,
 
-  // ---- รายงาน / audit ----
-  reports: (async (req, res) => {
-    res.json(await adminService.report(reportRangeSchema.parse(req.query)));
-  }) satisfies Handler,
-  auditLogs: (async (req, res) => {
-    res.json(await adminService.auditLogs(auditFiltersSchema.parse(req.query)));
-  }) satisfies Handler,
 };

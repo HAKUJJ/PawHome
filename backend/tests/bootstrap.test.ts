@@ -20,12 +20,10 @@ describe("bootstrapSuperAdmin", () => {
     expect(await prisma.adminMembership.count()).toBe(0);
   });
 
-  it("grants SUPER_ADMIN once, with an audit event, then refuses a second bootstrap", async () => {
+  it("grants SUPER_ADMIN once, then refuses a second bootstrap", async () => {
     const result = await bootstrapSuperAdmin(prisma, { userId: mind.id, allowDemo: true });
     expect(result).toMatchObject({ userId: mind.id, email: mind.email });
     expect(await prisma.adminMembership.findUnique({ where: { userId: mind.id } })).toMatchObject({ role: "SUPER_ADMIN" });
-    const audit = await prisma.adminAuditLog.findFirst({ where: { action: "admin.bootstrap_super_admin", targetId: mind.id } });
-    expect(audit).toMatchObject({ actorRole: "BOOTSTRAP_SCRIPT", result: "SUCCESS" });
 
     await expect(bootstrapSuperAdmin(prisma, { userId: shelter.id, allowDemo: true })).rejects.toThrow(/มี SUPER_ADMIN อยู่แล้ว/);
     expect(await prisma.adminMembership.findUnique({ where: { userId: shelter.id } })).toBeNull();

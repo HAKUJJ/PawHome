@@ -2,7 +2,6 @@
 import { Router } from "express";
 import { adoptionsController } from "../controllers/adoptions.controller.js";
 import { authController } from "../controllers/auth.controller.js";
-import { cronController } from "../controllers/cron.controller.js";
 import { favoritesController } from "../controllers/favorites.controller.js";
 import { petsController } from "../controllers/pets.controller.js";
 import { uploadsController } from "../controllers/uploads.controller.js";
@@ -81,8 +80,6 @@ routes.get("/announcements", async (_req, res) => {
 // ---- ผู้ดูแล ----
 routes.use("/admin", adminRoutes);
 
-// ---- งานตามเวลา (Vercel Cron) ----
-routes.get("/internal/cron/follow-ups", cronController.followUps);
 
 // ---- อัปโหลดรูป ----
 routes.post("/uploads", requireAuth, uploadImage, uploadsController.create);

@@ -1,6 +1,6 @@
 // Browser E2E ของเว็บสาธารณะ + ผู้ดูแล บนชุดข้อมูลทดสอบ (Chromium → Vite → Express จริง → PGlite, Auth ปลอม)
 // ครอบคลุม: สมัคร · ค้นหา · รายการโปรด · สร้าง/แก้โพสต์ · ขอรับเลี้ยง · ตอบรับ · นัดส่งมอบ · รายงาน · ข้อพิพาท · ยืนยัน
-//           ผู้ดูแลตรวจผล · แจ้งเตือน · ประกาศหน้าแรก · รายงาน · มือถือ 390px
+//           ผู้ดูแลตรวจผล · แจ้งเตือน · ประกาศหน้าแรก · ภาพรวมผู้ดูแล · มือถือ 390px
 //   1) cd backend && E2E_DEMO_DATASET=1 E2E_HANDOVER_WORKFLOW=1 npx tsx --import ./tests/e2e/loader.mjs tests/e2e/server.ts
 //   2) cd frontend && VITE_API_URL=http://localhost:3101/api npx vite --port 5182
 //   3) PAWHOME_PLAYWRIGHT=/path/to/playwright/index.mjs node scripts/public-workflow.e2e.mjs
@@ -192,14 +192,13 @@ await step("admin publishes an announcement → it appears on the home page", as
   await page.close();
 });
 
-await step("admin dashboard + reports read the seeded dataset", async () => {
+await step("admin dashboard reads the seeded dataset", async () => {
   await admin.goto(`${base}/admin`);
   await admin.getByRole("heading", { level: 1, name: "ภาพรวม" }).waitFor();
-  await admin.goto(`${base}/admin/reports`);
-  await admin.getByRole("heading", { level: 1, name: "รายงาน" }).waitFor();
   const token = await tokenOf(ADMIN);
-  const report = (await api("/admin/reports?from=2020-01-01", { token })).body;
-  assert.ok(report.requests.created >= 180, `report counts the dataset (${report.requests.created})`);
+  const dashboard = (await api("/admin/dashboard", { token })).body;
+  const total = Object.values(dashboard.stages).reduce((a, b) => a + b, 0);
+  assert.ok(total >= 180, `dashboard counts the dataset (${total})`);
 });
 
 await step("mobile 390px: pet page with handover panel and notifications fit the screen", async () => {

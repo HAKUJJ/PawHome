@@ -13,6 +13,7 @@ export const MIGRATIONS = [
   "../../database/migrations/001_admin_workflow.sql",
   "../../database/migrations/002_notifications_announcements.sql",
   "../../database/migrations/003_admin_workflow_contract.sql",
+  "../../database/migrations/004_simplify_admin.sql",
 ];
 
 export type VerifyRow = { check_name: string; expected: string; actual: string; ok: boolean };

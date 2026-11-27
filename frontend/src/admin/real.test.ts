@@ -8,7 +8,7 @@ vi.mock("../api/client", async () => {
 });
 
 const { ApiError } = await import("../api/client");
-const { caseNumber, fromAnnouncement, toAnnouncement, toAudit, toCase, toPet } = await import("./api");
+const { caseNumber, fromAnnouncement, toAnnouncement, toCase, toPet } = await import("./api");
 const { loadAdmin, mutateAdmin, realCaseAction } = await import("./real");
 const { usePreview } = await import("./store");
 
@@ -21,13 +21,12 @@ const pet = {
 const apiCase = {
   id: 12, petId: 7, applicantId: "u-app", applicantName: "ผู้ขอ", ownerId: "u-owner", ownerName: "เจ้าของ", phone: "0811111111",
   housing: "CONDO", message: "สนใจรับเลี้ยง", stage: "ACCEPTED", createdAt: "2026-11-20T03:00:00.000Z", lastActivityAt: "2026-11-21T03:00:00.000Z",
-  followUpRequired: false, escalated: false, disputed: false, legacyReview: true, closedAt: null, completedAt: null, verifiedAt: null, resolution: "",
+  followUpRequired: false, disputed: false, legacyReview: true, closedAt: null, completedAt: null, verifiedAt: null, resolution: "",
   reports: { owner: { party: "OWNER", handoverDate: "2026-11-21", outcome: "HANDED_OVER", note: "", evidenceUrl: "https://x.test/a.jpg" }, applicant: null },
   confirmations: { owner: false, applicant: false },
 };
-const users = [{ id: "u-owner", name: "เจ้าของ", role: "USER", suspended: false, suspendedReason: "", joinedAt: "2026-01-01T00:00:00.000Z" }];
+const users = [{ id: "u-owner", name: "เจ้าของ", role: "USER", joinedAt: "2026-01-01T00:00:00.000Z" }];
 const announcement = { id: 3, title: "ตลาดนัด", category: "กิจกรรม", description: "", eventDate: null, eventTime: "", location: "", contact: "", cta: "ดู", destination: "/pets", imageUrl: "", status: "PUBLISHED", displayOrder: 1, isDemo: false };
-const audit = { items: [{ id: "1", actorName: "ผู้ดูแลจริง", action: "pet.request_changes", targetType: "pet", targetId: "7", reason: "รูปไม่ชัด", createdAt: "2026-11-22T00:00:00.000Z" }], total: 1, page: 1, limit: 50 };
 
 function backend(overrides: Record<string, () => unknown> = {}) {
   request.mockImplementation(async (path: string) => {
@@ -38,14 +37,13 @@ function backend(overrides: Record<string, () => unknown> = {}) {
     if (path.startsWith("/admin/adoptions")) return { items: [apiCase], total: 1, page: 1, limit: 200 };
     if (path.startsWith("/admin/users")) return { items: users, total: 1, page: 1, limit: 200 };
     if (path === "/admin/announcements") return [announcement];
-    if (path.startsWith("/admin/audit-logs")) return audit;
     return {};
   });
 }
 
 beforeEach(() => {
   request.mockReset();
-  usePreview.setState({ status: "checking", pets: [], cases: [], users: [], announcements: [], logs: [] });
+  usePreview.setState({ status: "checking", pets: [], cases: [], users: [], announcements: [] });
 });
 
 describe("mapping Backend → screen model", () => {
@@ -67,10 +65,6 @@ describe("mapping Backend → screen model", () => {
     expect(fromAnnouncement(screen)).toMatchObject({ status: "PUBLISHED", displayOrder: 1, eventDate: null, destination: "/pets" });
   });
 
-  it("audit entries get readable labels and targets", () => {
-    const entry = toAudit(audit.items[0], { pets: new Map([["7", "ข้าวตัง"]]), users: new Map(), announcements: new Map() });
-    expect(entry).toMatchObject({ action: "ส่งโพสต์กลับไปแก้ไข", target: "ข้าวตัง", category: "สัตว์เลี้ยง", note: "รูปไม่ชัด" });
-  });
 });
 
 describe("loadAdmin: role is verified by the Backend before any data", () => {
@@ -83,7 +77,6 @@ describe("loadAdmin: role is verified by the Backend before any data", () => {
     expect(state.pets.map((p) => p.id)).toEqual([7]);
     expect(state.cases.map((c) => c.id)).toEqual(["AD-12"]);
     expect(state.preferences.name).toBe("ผู้ดูแลจริง");
-    expect(state.logs[0].target).toBe("ข้าวตัง");
   });
 
   it.each([

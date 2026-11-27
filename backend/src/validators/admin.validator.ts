@@ -23,12 +23,11 @@ export const caseFiltersSchema = z.object({
 
 export const followUpSchema = z
   .object({
-    kind: z.enum(["FLAG", "UNFLAG", "CONTACT", "NOTE", "RESOLVE"], { errorMap: () => ({ message: "kind ไม่ถูกต้อง" }) }),
+    kind: z.enum(["FLAG", "UNFLAG", "NOTE", "RESOLVE"], { errorMap: () => ({ message: "kind ไม่ถูกต้อง" }) }),
     note: optionalNote,
   })
-  .refine((v) => !["CONTACT", "NOTE"].includes(v.kind) || v.note.length > 0, { message: "กรุณากรอกรายละเอียด", path: ["note"] });
+  .refine((v) => v.kind !== "NOTE" || v.note.length > 0, { message: "กรุณากรอกรายละเอียด", path: ["note"] });
 
-export const escalateSchema = z.object({ note: optionalNote });
 export const closeSchema = z.object({ note: optionalNote });
 
 export const reviewHandoverSchema = z.object({
@@ -59,14 +58,7 @@ export const userFiltersSchema = z.object({
   page,
   limit,
   q,
-  status: z.enum(["active", "suspended"]).optional(),
   role: z.enum(["USER", "ADMIN", "SUPER_ADMIN"]).optional(),
-});
-
-export const suspendSchema = z.object({ reason: reason("เหตุผลที่ระงับบัญชี").pipe(z.string().max(500)) });
-
-export const adminRoleSchema = z.object({
-  role: z.enum(["ADMIN", "SUPER_ADMIN"], { errorMap: () => ({ message: "role ต้องเป็น ADMIN หรือ SUPER_ADMIN" }) }),
 });
 
 // ปลายทางในเว็บเท่านั้น ("/" หรือ "/path") — ตรงกับ check constraint ในฐานข้อมูล
@@ -99,26 +91,6 @@ export const announcementUpdateSchema = z.object(announcementFields)
   .refine(windowOk, { message: "วันหมดอายุต้องหลังวันเผยแพร่", path: ["expireAt"] })
   .refine((v) => Object.values(v).some((x) => x !== undefined), { message: "ไม่มีข้อมูลที่จะแก้ไข" });
 
-export const reportRangeSchema = z
-  .object({
-    from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "from ต้องเป็น YYYY-MM-DD").optional(),
-    to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "to ต้องเป็น YYYY-MM-DD").optional(),
-  })
-  .transform(({ from, to }) => {
-    const end = to ? new Date(`${to}T23:59:59.999Z`) : new Date();
-    const start = from ? new Date(`${from}T00:00:00.000Z`) : new Date(end.getTime() - 30 * 86_400_000);
-    return { start, end };
-  })
-  .refine((r) => r.start <= r.end, { message: "from ต้องไม่เกิน to" });
-
-export const auditFiltersSchema = z.object({
-  page,
-  limit,
-  action: z.string().trim().max(100).optional(),
-  targetType: z.string().trim().max(50).optional(),
-  targetId: z.string().trim().max(100).optional(),
-});
-
 export type CaseFilters = z.infer<typeof caseFiltersSchema>;
 export type FollowUpInput = z.infer<typeof followUpSchema>;
 export type ReviewHandoverInput = z.infer<typeof reviewHandoverSchema>;
@@ -127,4 +99,3 @@ export type ModerationInput = z.infer<typeof moderationSchema>;
 export type UserFilters = z.infer<typeof userFiltersSchema>;
 export type AnnouncementCreate = z.infer<typeof announcementCreateSchema>;
 export type AnnouncementUpdate = z.infer<typeof announcementUpdateSchema>;
-export type ReportRange = z.infer<typeof reportRangeSchema>;

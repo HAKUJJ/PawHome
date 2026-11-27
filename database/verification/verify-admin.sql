@@ -28,6 +28,7 @@ begin
     select count(*) into n from public.pets where id = v_pet;
     insert into admin_rls_results values ('rls anon: hidden pet invisible', '0', n::text);
     begin
+      if to_regclass('public.admin_audit_logs') is null then raise insufficient_privilege; end if; -- ลบแล้วใน 004
       select count(*) into n from public.admin_audit_logs;
       outcome := 'readable';
     exception when insufficient_privilege then outcome := 'blocked';
@@ -47,6 +48,7 @@ begin
     insert into admin_rls_results values ('rls user: self-grant admin role', 'blocked', outcome);
 
     begin -- ปลดการระงับบัญชีตัวเอง
+      if to_regclass('public.user_suspensions') is null then raise insufficient_privilege; end if; -- ลบแล้วใน 004
       delete from public.user_suspensions where user_id = v_mind;
       outcome := 'allowed';
     exception when insufficient_privilege then outcome := 'blocked';
@@ -54,6 +56,7 @@ begin
     insert into admin_rls_results values ('rls user: delete own suspension', 'blocked', outcome);
 
     begin -- อ่าน audit log
+      if to_regclass('public.admin_audit_logs') is null then raise insufficient_privilege; end if; -- ลบแล้วใน 004
       select count(*) into n from public.admin_audit_logs;
       outcome := 'readable';
     exception when insufficient_privilege then outcome := 'blocked';
@@ -107,20 +110,24 @@ begin
     insert into admin_rls_results values ('rls owner: own hidden pet visible', '1', n::text);
     execute 'reset role';
 
-    -- ---------- append-only (แม้แต่ role postgres) ----------
-    insert into public.admin_audit_logs (action, target_type) values ('verify', 'system');
-    begin
-      update public.admin_audit_logs set reason = 'แก้' where action = 'verify';
-      outcome := 'allowed';
-    exception when raise_exception then outcome := 'blocked';
-    end;
-    insert into admin_rls_results values ('audit log: update', 'blocked', outcome);
-    begin
-      delete from public.admin_audit_logs where action = 'verify';
-      outcome := 'allowed';
-    exception when raise_exception then outcome := 'blocked';
-    end;
-    insert into admin_rls_results values ('audit log: delete', 'blocked', outcome);
+    -- ---------- append-only (แม้แต่ role postgres) · ตารางถูกลบใน 004 = ไม่มีให้แก้ ----------
+    if to_regclass('public.admin_audit_logs') is null then
+      insert into admin_rls_results values ('audit log: update', 'blocked', 'blocked'), ('audit log: delete', 'blocked', 'blocked');
+    else
+      execute $q$insert into public.admin_audit_logs (action, target_type) values ('verify', 'system')$q$;
+      begin
+        execute $q$update public.admin_audit_logs set reason = 'แก้' where action = 'verify'$q$;
+        outcome := 'allowed';
+      exception when raise_exception then outcome := 'blocked';
+      end;
+      insert into admin_rls_results values ('audit log: update', 'blocked', outcome);
+      begin
+        execute $q$delete from public.admin_audit_logs where action = 'verify'$q$;
+        outcome := 'allowed';
+      exception when raise_exception then outcome := 'blocked';
+      end;
+      insert into admin_rls_results values ('audit log: delete', 'blocked', outcome);
+    end if;
 
     -- ---------- constraint: status ต้องตรงกับ stage ----------
     select min(id) into v_req from public.adoption_requests;
@@ -155,13 +162,11 @@ with checks(check_name, expected, actual) as (
 
   -- โครงสร้าง
   union all select 'table: ' || t, 'true', (to_regclass('public.' || t) is not null)::text
-  from unnest(array['admin_memberships', 'user_suspensions', 'adoption_stage_history', 'adoption_handover_reports',
-                    'adoption_follow_ups', 'notification_events', 'admin_audit_logs', 'announcements']) t
+  from unnest(array['admin_memberships', 'adoption_stage_history', 'adoption_handover_reports',
+                    'adoption_follow_ups', 'notification_events', 'announcements']) t
   union all select 'rls enabled: ' || c.relname, 'true', c.relrowsecurity::text
   from pg_class c join pg_namespace s on s.oid = c.relnamespace
   where s.nspname = 'public' and c.relkind = 'r'
-  union all select 'trigger: audit append-only', '2',
-    (select count(*) from pg_trigger where tgrelid = 'public.admin_audit_logs'::regclass and not tgisinternal)::text
 
   -- ข้อมูลสอดคล้อง
   union all select 'integrity: stage/status consistent', '0',

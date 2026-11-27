@@ -88,16 +88,15 @@ export function CaseBadges({ item, now }: { item: AdoptionCase; now: number }) {
     {!isTerminal(item.stage) && !item.closed && <Badge tone={tone}>{chip}</Badge>}
     {item.disputed && <Badge tone="danger">ต้องตรวจสอบ</Badge>}
     {item.flagged && <Badge tone="warning">ต้องติดตาม (ธง)</Badge>}
-    {item.escalated && <Badge tone="danger">ส่งต่อเร่งด่วน</Badge>}
     {item.verified && <Badge tone="success">ตรวจสอบแล้ว</Badge>}
     {item.closed && <Badge>ปิดเคสแล้ว</Badge>}
   </div>;
 }
 
 const tabs = [["overview", "ภาพรวม"], ["timeline", "ไทม์ไลน์"], ["notes", "บันทึกติดตาม"], ["handover", "รายงานส่งมอบ"]] as const;
-type Prompt = "contact" | "note" | "verify" | "legacyComplete" | "legacyReopen";
+type Prompt = "note" | "verify" | "legacyComplete" | "legacyReopen";
 const promptTitle: Record<Prompt, string> = {
-  contact: "บันทึกการติดต่อ", note: "เพิ่มบันทึกติดตาม", verify: "ยืนยันผลตรวจสอบการส่งมอบ",
+  note: "เพิ่มบันทึกติดตาม", verify: "ยืนยันผลตรวจสอบการส่งมอบ",
   legacyComplete: "ยืนยันว่าส่งมอบแล้ว (คำขอจากระบบเดิม)", legacyReopen: "ยังไม่ได้ส่งมอบ ให้ดำเนินการต่อ",
 };
 
@@ -161,15 +160,13 @@ function CaseWorkspace({ item }: { item: AdoptionCase }) {
     {tab === "notes" && <Card title="บันทึกติดตามของผู้ดูแล"><Timeline item={item} notesOnly /></Card>}
     {tab === "handover" && <Card title="รายงานและการยืนยันการส่งมอบ"><HandoverDetails item={item} /></Card>}
 
-    <Card title="การดำเนินการของผู้ดูแล" subtitle="มีผลกับข้อมูลจริงและบันทึกใน Audit Log · ผู้ดูแลไม่เลือกผู้รับเลี้ยงแทนเจ้าของ">
+    <Card title="การดำเนินการของผู้ดูแล" subtitle="มีผลกับข้อมูลจริงทันที · ผู้ดูแลไม่เลือกผู้รับเลี้ยงแทนเจ้าของ">
       <div className="ad-row">
         {open && <>
           <button type="button" className="ad-btn" onClick={() => run({ type: item.flagged ? "unflag" : "flag" }, item.flagged ? "นำธงออกแล้ว" : "ตั้งธงต้องติดตามแล้ว")}>
             {item.flagged ? "นำธงต้องติดตามออก" : "ตั้งธงต้องติดตาม"}
           </button>
-          <button type="button" className="ad-btn" onClick={() => setPrompt("contact")}>บันทึกการติดต่อ</button>
           <button type="button" className="ad-btn" onClick={() => setPrompt("note")}>เพิ่มบันทึกติดตาม</button>
-          {!item.escalated && <button type="button" className="ad-btn" onClick={() => run({ type: "escalate" }, "ส่งต่อเคสเร่งด่วนแล้ว")}>ส่งต่อเร่งด่วน</button>}
           {item.stage === "HANDOVER_REPORTED" && tab !== "handover" && <Link className="ad-btn" to="?tab=handover">ตรวจรายงานส่งมอบ</Link>}
           {item.stage === "HANDOVER_REPORTED" && !item.disputed && <button type="button" className="ad-btn" onClick={() => confirm({
             title: "ทำเครื่องหมายข้อพิพาท", description: "เคสจะเข้าคิวตรวจสอบ และปิดเป็นสำเร็จได้หลังผู้ดูแลยืนยันผลตรวจเท่านั้น", label: "ทำเครื่องหมาย", danger: true,
@@ -191,11 +188,11 @@ function CaseWorkspace({ item }: { item: AdoptionCase }) {
       {item.disputed && !canVerify && <p className="ad-muted ad-small ad-mt">ยืนยันผลตรวจได้เมื่อรายงานสองฝ่ายตรงกันและทั้งคู่ยืนยันแล้ว</p>}
     </Card>
 
-    {prompt && <NotePrompt title={promptTitle[prompt]} verify={prompt !== "contact" && prompt !== "note"} onClose={() => setPrompt(null)} onSave={(note) => {
+    {prompt && <NotePrompt title={promptTitle[prompt]} verify={prompt !== "note"} onClose={() => setPrompt(null)} onSave={(note) => {
       setPrompt(null);
       if (prompt === "verify") confirm({ title: promptTitle.verify, description: "บันทึกผลตรวจและยืนยันว่าการส่งมอบเกิดขึ้นจริง · น้องจะเปลี่ยนเป็นได้บ้านแล้ว", label: "ยืนยันผลตรวจ", action: () => run({ type: "verify", note }, "ยืนยันผลตรวจสอบแล้ว") });
       else if (prompt === "legacyComplete" || prompt === "legacyReopen") run({ type: prompt, note }, prompt === "legacyComplete" ? "ยืนยันการส่งมอบแล้ว" : "เปิดเคสให้ดำเนินการส่งมอบต่อแล้ว");
-      else run({ type: prompt, note }, prompt === "contact" ? "บันทึกการติดต่อแล้ว" : "เพิ่มบันทึกแล้ว");
+      else run({ type: prompt, note }, "เพิ่มบันทึกแล้ว");
     }} />}
     {dialog}
   </>;

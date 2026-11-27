@@ -1,6 +1,6 @@
 -- ลบเฉพาะชุดข้อมูลสาธิตขนาดเล็ก pawhome-demo-minimal-v1 (ไม่ใช้ TRUNCATE · ไม่แตะข้อมูลอื่น)
 -- คำขอ ไทม์ไลน์ รายงาน บันทึกติดตาม แจ้งเตือน รายการโปรด ถูกลบตาม FK (on delete cascade) ของน้อง
--- ไม่ลบ: admin_audit_logs (append-only โดยออกแบบ — แยกด้วย changes.dataset) และบัญชีใน Supabase Auth
+-- ไม่ลบ: บัญชีใน Supabase Auth
 begin;
 do $$
 begin

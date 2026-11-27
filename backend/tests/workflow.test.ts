@@ -6,13 +6,11 @@ import { describe, expect, inject, it, vi } from "vitest";
 
 process.env.DATABASE_URL = inject("adminDatabaseUrl");
 process.env.ADOPTION_HANDOVER_WORKFLOW = "true";
-process.env.CRON_SECRET = "test-cron-secret-0123456789abcdef0123";
 vi.mock("../src/config/supabase.js", () => import("./fake-supabase.js"));
 
 const { app } = await import("../src/app.js");
 const { registerAccount } = await import("./fake-supabase.js");
 const { prisma } = await import("../src/config/prisma.js");
-const { followUpService } = await import("../src/services/follow-up.service.js");
 
 const api = request(app);
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
@@ -258,44 +256,21 @@ describe("concurrency (atomic conditional updates)", () => {
   });
 });
 
-describe("follow-up policy + idempotent cron", () => {
-  it("admin contact/escalate do not touch the owner's clock; escalate twice → 409", async () => {
+describe("follow-up policy", () => {
+  it("priority comes from the owner's idle time; admin notes do not touch the clock or the stage", async () => {
     const petId = await newPet();
     const id = await apply(petId);
     const old = new Date(Date.now() - 50 * 3_600_000);
     await prisma.adoptionRequest.update({ where: { id }, data: { lastActivityAt: old } });
     const detail = await api.get(`/api/admin/adoptions/${id}`).set(auth(admin.token));
     expect(detail.body.followUp).toMatchObject({ idle: 50, overdue: true, priority: "high", required: true });
-    await api.post(`/api/admin/adoptions/${id}/follow-ups`).set(auth(admin.token)).send({ kind: "CONTACT", note: "โทรแล้วไม่รับสาย" });
-    expect((await api.post(`/api/admin/adoptions/${id}/escalate`).set(auth(admin.token)).send({ note: "ส่งต่อหัวหน้า" })).body.followUp.priority).toBe("urgent");
-    expect((await api.post(`/api/admin/adoptions/${id}/escalate`).set(auth(admin.token)).send({})).status).toBe(409);
-    expect((await prisma.adoptionRequest.findUniqueOrThrow({ where: { id } })).lastActivityAt).toEqual(old);
-    expect(await stage(id)).toBe("PENDING"); // ไม่มีการเปลี่ยนขั้นอัตโนมัติ
-  });
-
-  it("cron requires the secret, creates events once, never changes stages", async () => {
-    const petId = await newPet();
-    const id = await apply(petId);
+    await api.post(`/api/admin/adoptions/${id}/follow-ups`).set(auth(admin.token)).send({ kind: "NOTE", note: "โทรแล้วไม่รับสาย" });
     await prisma.adoptionRequest.update({ where: { id }, data: { lastActivityAt: new Date(Date.now() - 80 * 3_600_000) } });
-    expect((await api.get("/api/internal/cron/follow-ups")).status).toBe(401);
-    expect((await api.get("/api/internal/cron/follow-ups").set({ Authorization: "Bearer wrong-secret-wrong-secret-wrong-secret" })).status).toBe(401);
-
-    const first = await api.get("/api/internal/cron/follow-ups").set({ Authorization: `Bearer ${process.env.CRON_SECRET}` });
-    expect(first.status).toBe(200);
-    const cronKinds = ["ADMIN_FOLLOW_UP", "ESCALATION", "OWNER_REMINDER", "OWNER_SECOND_REMINDER"];
-    const events = await prisma.notificationEvent.findMany({ where: { requestId: id, kind: { in: cronKinds } }, orderBy: { kind: "asc" } });
-    expect(events.map((e) => e.kind)).toEqual(cronKinds);
-    const again = await followUpService.sweep();
-    expect(await prisma.notificationEvent.count({ where: { requestId: id, kind: { in: cronKinds } } })).toBe(4);
-    expect(again.created).toBe(0);
-    expect(await stage(id)).toBe("PENDING");
-
+    expect((await api.get(`/api/admin/adoptions/${id}`).set(auth(admin.token))).body.followUp.priority).toBe("urgent");
+    expect(await stage(id)).toBe("PENDING"); // ไม่มีการเปลี่ยนขั้นอัตโนมัติ
+    // แจ้งเตือนตามเหตุการณ์เท่านั้น (ไม่มี cron): เจ้าของได้ NEW_REQUEST
     const mine = await api.get("/api/me/notifications").set(auth(owner.token));
-    expect(mine.body.items.filter((e: { requestId: number }) => e.requestId === id).map((e: { kind: string }) => e.kind).sort())
-      .toEqual(["NEW_REQUEST", "OWNER_REMINDER", "OWNER_SECOND_REMINDER"]);
-    // ผู้ขอไม่เห็นแจ้งเตือนของเจ้าของ · คิวผู้ดูแล (recipient null) ไม่แสดงให้ใคร
-    const applicantItems = (await api.get("/api/me/notifications").set(auth(applicant.token))).body.items;
-    expect(applicantItems.some((e: { requestId: number }) => e.requestId === id)).toBe(false);
+    expect(mine.body.items.filter((e: { requestId: number }) => e.requestId === id).map((e: { kind: string }) => e.kind)).toEqual(["NEW_REQUEST"]);
   });
 
   it("timeline shows reports, confirmations and admin actions in order", async () => {

@@ -28,20 +28,19 @@ checks (check_name, expected, actual) as (
   union all select 'all pets VISIBLE (no pre-moderation)', '0', (select count(*) from public.pets where visibility <> 'VISIBLE')::text
 
   -- ---------- schema ----------
-  union all select 'new tables exist', '8', (select count(*) from pg_tables where schemaname = 'public' and tablename in
-    ('admin_memberships', 'user_suspensions', 'adoption_stage_history', 'adoption_handover_reports',
-     'adoption_follow_ups', 'notification_events', 'admin_audit_logs', 'announcements'))::text
+  union all select 'new tables exist', '6', (select count(*) from pg_tables where schemaname = 'public' and tablename in
+    ('admin_memberships', 'adoption_stage_history', 'adoption_handover_reports',
+     'adoption_follow_ups', 'notification_events', 'announcements'))::text
   union all select 'migration 002: notification_events.payload + announcements.publish_at', '2', (select count(*) from information_schema.columns
     where table_schema = 'public' and ((table_name = 'notification_events' and column_name = 'payload') or (table_name = 'announcements' and column_name = 'publish_at')))::text
-  union all select 'audit log append-only trigger', '2', (select count(*) from pg_trigger where tgrelid = 'public.admin_audit_logs'::regclass and not tgisinternal)::text
   union all select 'no admin accounts yet (bootstrap is a separate gate)', '0', (select count(*) from public.admin_memberships)::text
 
   -- ---------- security ----------
   union all select 'RLS enabled on every public table', '0', (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity)::text
-  union all select 'anon cannot read admin_audit_logs / adoption_follow_ups / admin_memberships', '0', (select count(*) from unnest(array[
+  union all select 'anon cannot read admin tables (follow-ups / memberships / audit · suspensions until 004)', '0', (select count(*) from unnest(array[
     'public.admin_audit_logs', 'public.adoption_follow_ups', 'public.admin_memberships', 'public.user_suspensions']) t
-    where has_table_privilege('anon', t, 'SELECT'))::text
+    where to_regclass(t) is not null and has_table_privilege('anon', t, 'SELECT'))::text
   union all select 'authenticated cannot write stage / visibility / legacy_review directly', '0', (select count(*) from (values
     ('adoption_requests', 'stage'), ('adoption_requests', 'legacy_review'), ('pets', 'visibility')) v(t, c)
     where has_column_privilege('authenticated', 'public.' || v.t, v.c, 'UPDATE'))::text

@@ -67,8 +67,8 @@ describe("follow-up policy", () => {
       expect(followUp(pending(), start + hours * HOUR).priority).toBe(priority);
     });
 
-  it("admin contact and notes do not reset the owner's idle clock", () => {
-    const item = run([{ type: "contact", note: "โทรแล้ว" }, { type: "note", note: "รอ" }, { type: "flag" }, { type: "unflag" }]);
+  it("admin notes and flags do not reset the owner's idle clock", () => {
+    const item = run([{ type: "note", note: "โทรแล้ว" }, { type: "note", note: "รอ" }, { type: "flag" }, { type: "unflag" }]);
     expect(item.activityAt).toBe(start);
     expect(followUp(item, start + 50 * HOUR)).toMatchObject({ hours: 50, overdue: true, priority: "high" });
   });

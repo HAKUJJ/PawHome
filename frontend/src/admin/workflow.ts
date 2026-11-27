@@ -41,7 +41,6 @@ export interface AdoptionCase {
   housing: string;
   flagged: boolean; // FOLLOW_UP_REQUIRED ที่ผู้ดูแลตั้งเอง (แยกจาก stage)
   disputed: boolean;
-  escalated: boolean;
   closed: boolean;
   verified: boolean;
   legacy?: boolean; // Real Mode: อนุมัติจากระบบเดิม ยังไม่มีหลักฐานส่งมอบ รอผู้ดูแลตัดสิน
@@ -56,8 +55,8 @@ export type CaseAction =
   | { type: "accept" | "reject" | "arrange" | "cancel" }
   | { type: "report"; party: Party; report: Handover }
   | { type: "confirm" | "dispute"; party: Party }
-  | { type: "flag" | "unflag" | "escalate" | "markDisputed" | "close" }
-  | { type: "contact" | "note" | "verify"; note: string }
+  | { type: "flag" | "unflag" | "markDisputed" | "close" }
+  | { type: "note" | "verify"; note: string }
   // Real Mode เท่านั้น: ตัดสินคำขอจากระบบเดิม (ยืนยันว่าส่งมอบแล้ว / ยังไม่ได้ส่งมอบ ให้ดำเนินการต่อ)
   | { type: "legacyComplete" | "legacyReopen"; note: string };
 
@@ -75,7 +74,7 @@ export function followUp(item: AdoptionCase, now: number) {
   const overdue = !isTerminal(item.stage) && idle >= 48;
   let priority: Priority = "normal";
   if (!isTerminal(item.stage) && !item.closed) {
-    if (item.disputed || item.escalated || idle >= 72) priority = "urgent";
+    if (item.disputed || idle >= 72) priority = "urgent";
     else if (item.flagged || overdue) priority = "high";
     else if (idle >= 24) priority = "reminder";
   }
@@ -143,11 +142,8 @@ export function transition(item: AdoptionCase, action: CaseAction, now: number):
       return item.flagged ? item : record("admin", "ตั้งธงต้องติดตาม", { flagged: true });
     case "unflag":
       return item.flagged ? record("admin", "นำธงต้องติดตามออก", { flagged: false }) : item;
-    case "escalate":
-      return item.escalated ? item : record("admin", "ส่งต่อเคสเร่งด่วน", { escalated: true });
-    case "contact":
     case "note":
-      return note ? record("admin", action.type === "contact" ? "บันทึกการติดต่อ" : "เพิ่มบันทึกติดตาม", {}, note) : item;
+      return note ? record("admin", "เพิ่มบันทึกติดตาม", {}, note) : item;
     default:
       return item;
   }
@@ -167,7 +163,7 @@ export function createCase(id: string, petId: number, applicantId: string, now: 
   return {
     id, petId, applicantId, stage: "PENDING", createdAt: now, activityAt: now,
     contact: "08x-xxx-xxxx (ข้อมูลจำลอง)", message: "มีพื้นที่ในบ้านและพร้อมดูแลระยะยาว", housing: "บ้านเดี่ยว", ...detail,
-    flagged: false, disputed: false, escalated: false, closed: false, verified: false, reports: {}, confirmations: {},
+    flagged: false, disputed: false, closed: false, verified: false, reports: {}, confirmations: {},
     timeline: [{ actor: "applicant", label: "ส่งคำขอรับเลี้ยง", at: now }],
   };
 }

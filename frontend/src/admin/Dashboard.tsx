@@ -7,7 +7,7 @@ import { followUp, HOUR, isTerminal, stageLabel, type AdoptionCase } from "./wor
 const WEEK = 7 * 24 * HOUR;
 export const handoverStages = ["ACCEPTED", "ARRANGING_HANDOVER", "HANDOVER_REPORTED"];
 
-// ตัวเลขทั้งหมดของแดชบอร์ด คำนวณจากข้อมูลชุดเดียวกับหน้ารายการและรายงาน
+// ตัวเลขทั้งหมดของแดชบอร์ด คำนวณจากข้อมูลชุดเดียวกับหน้ารายการ
 export function metrics(data: PreviewData) {
   const now = Date.now();
   const open = data.cases.filter((item) => !isTerminal(item.stage) && !item.closed);
@@ -78,13 +78,12 @@ export function Dashboard() {
           <Badge tone="warning">รอตรวจ</Badge>
         </li>)}</ul> : <Empty title="ไม่มีประกาศรอตรวจ" />}
       </Card>
-      {data.preferences.trends ? <Card title="แนวโน้มคำขอรับเลี้ยง" subtitle="คำขอรับเลี้ยงรายสัปดาห์ (8 สัปดาห์ล่าสุด)"
-      action={<Link className="ad-btn-link" to="/admin/reports">รายงานเต็ม →</Link>}>
+      <Card title="แนวโน้มคำขอรับเลี้ยง" subtitle="คำขอรับเลี้ยงรายสัปดาห์ (8 สัปดาห์ล่าสุด)">
       <div className="ad-columns" role="img" aria-label={`คำขอรายสัปดาห์ ${trend.map((entry) => `${entry.label} ${entry.requests} คำขอ`).join(", ")}`}>
         {trend.map((entry, index) => <div key={index}><b>{entry.requests}</b><i style={{ height: `${Math.max(3, (entry.requests / peak) * 100)}%` }} /><span>{entry.label}</span></div>)}
       </div>
       <p className="ad-muted ad-small ad-mt">รวม {trend.reduce((sum, entry) => sum + entry.requests, 0)} คำขอ · รับเลี้ยงสำเร็จ {trend.reduce((sum, entry) => sum + entry.completed, 0)} เคสในช่วงเดียวกัน</p>
-    </Card> : <Card title="แนวโน้มคำขอรับเลี้ยง"><p className="ad-muted">ปิดการแสดงกราฟไว้ในหน้าตั้งค่า</p></Card>}
+    </Card>
     </div>
 
     <div className="ad-stats" aria-label="สถานะระบบ" role="group">
@@ -94,13 +93,13 @@ export function Dashboard() {
       <StatCard label="ประกาศที่เผยแพร่" value={stats.published} icon="megaphone" to="/admin/announcements" />
     </div>
 
-    {data.preferences.showQuickActions && <Card title="ทางลัด">
+    <Card title="ทางลัด">
       <div className="ad-row">
         <Link className="ad-btn ad-btn-primary" to="/admin/adoptions?filter=overdue">ติดตามเคสเกินเวลา</Link>
         <Link className="ad-btn" to="/admin/pets?status=review">ตรวจโพสต์ใหม่ ({stats.review})</Link>
         <Link className="ad-btn" to="/admin/announcements">จัดการประกาศ</Link>
       </div>
-    </Card>}
+    </Card>
 
     <div className="ad-grid-2">
       <Card title="โพสต์สัตว์ล่าสุด" action={<Link className="ad-btn-link" to="/admin/pets">ดูทั้งหมด →</Link>}>
@@ -121,12 +120,6 @@ export function Dashboard() {
             <Badge tone={stageTone(item)}>{stageLabel[item.stage]}</Badge>
           </li>;
         })}</ul>
-      </Card>
-      <Card title="กิจกรรมผู้ใช้ล่าสุด">
-        <ul className="ad-list">{data.logs.slice(0, 5).map((entry) => <li key={entry.id}>
-          <span className="ad-min0"><b>{entry.actor}</b> · {entry.action} <span className="ad-muted">({entry.target.length > 24 ? `${entry.target.slice(0, 24)}…` : entry.target})</span></span>
-          <span className="ad-muted ad-small">{ago(entry.at, now)}</span>
-        </li>)}</ul>
       </Card>
       <Card title="ประชาสัมพันธ์" action={<Link className="ad-btn-link" to="/admin/announcements">จัดการ →</Link>}>
         <ul className="ad-list">{[...data.announcements].sort((a, b) => a.order - b.order).map((entry) => <li key={entry.id}>

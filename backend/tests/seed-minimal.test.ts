@@ -19,7 +19,7 @@ async function migratedDb(withUsers = true) {
   return db;
 }
 const TABLES = ["profiles", "pets", "favorites", "adoption_requests", "adoption_stage_history", "adoption_handover_reports",
-  "adoption_follow_ups", "announcements", "notification_events", "admin_audit_logs", "admin_memberships"];
+  "adoption_follow_ups", "announcements", "notification_events", "admin_memberships"];
 async function counts(db: PGlite) {
   const out: Record<string, number> = {};
   for (const t of TABLES) out[t] = (await db.query<{ n: number }>(`select count(*)::int n from public.${t}`)).rows[0].n;
@@ -39,7 +39,7 @@ describe("minimal demo dataset", async () => {
 
   it("creates the small dataset", () => {
     expect(first).toMatchObject({ profiles: 6, pets: 10, adoption_requests: 12, favorites: 8, adoption_stage_history: 36, adoption_handover_reports: 6,
-      adoption_follow_ups: 4, announcements: 3, notification_events: 16, admin_audit_logs: 10, admin_memberships: 1 });
+      adoption_follow_ups: 4, announcements: 3, notification_events: 16, admin_memberships: 1 });
   });
 
   it("minimal/verify.sql: every check passes (counts, 10 scenarios, pet status, FK, RBAC)", async () => {
@@ -53,7 +53,7 @@ describe("minimal demo dataset", async () => {
   it("cleanup removes only this dataset and the seed can run again", async () => {
     await db.exec(`insert into public.announcements (title) values ('ประกาศอื่นที่ไม่ใช่เดโม่')`);
     await db.exec(read("../../database/seeds/minimal/cleanup.sql"));
-    expect(await counts(db)).toMatchObject({ pets: 0, adoption_requests: 0, notification_events: 0, announcements: 1, admin_memberships: 0, admin_audit_logs: 10 });
+    expect(await counts(db)).toMatchObject({ pets: 0, adoption_requests: 0, notification_events: 0, announcements: 1, admin_memberships: 0 });
     await db.exec(seedSql);
     expect(await failing(db, "../../database/seeds/minimal/verify.sql")).toEqual([]);
   });

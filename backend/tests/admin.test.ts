@@ -5,7 +5,6 @@ import { describe, expect, inject, it, vi } from "vitest";
 
 process.env.DATABASE_URL = inject("adminDatabaseUrl");
 delete process.env.ADOPTION_HANDOVER_WORKFLOW;
-delete process.env.CRON_SECRET;
 vi.mock("../src/config/supabase.js", () => import("./fake-supabase.js"));
 
 const { app } = await import("../src/app.js");
@@ -32,7 +31,7 @@ const form = { phone: "0811111111", housing: "HOUSE", message: "มีบ้า�
 
 describe("RBAC: who can enter /api/admin", () => {
   it("anonymous → 401 on every admin route", async () => {
-    for (const path of ["/api/admin/me", "/api/admin/dashboard", "/api/admin/pets", "/api/admin/audit-logs"]) {
+    for (const path of ["/api/admin/me", "/api/admin/dashboard", "/api/admin/pets", "/api/admin/users"]) {
       expect((await api.get(path)).status).toBe(401);
     }
   });
@@ -61,26 +60,10 @@ describe("RBAC: who can enter /api/admin", () => {
     expect(await prisma.adminMembership.findUnique({ where: { userId: alice.id } })).toBeNull();
   });
 
-  it("ADMIN cannot assign SUPER_ADMIN (or any role) — denied attempt is audited", async () => {
-    const res = await api.put(`/api/admin/admins/${bob.id}`).set(auth(admin.token)).send({ role: "SUPER_ADMIN" });
-    expect(res.status).toBe(403);
+  it("no role-management API: admins are set only by scripts/grant-super-admin.ts", async () => {
+    expect((await api.put(`/api/admin/admins/${bob.id}`).set(auth(superAdmin.token)).send({ role: "ADMIN" })).status).toBe(404);
+    expect((await api.get("/api/admin/admins").set(auth(superAdmin.token))).status).toBe(404);
     expect(await prisma.adminMembership.findUnique({ where: { userId: bob.id } })).toBeNull();
-    const denied = await prisma.adminAuditLog.findFirst({ where: { actorId: admin.id, result: "DENIED" } });
-    expect(denied).toMatchObject({ action: "permission.denied" });
-  });
-
-  it("SUPER_ADMIN grants/revokes admins but cannot change own role", async () => {
-    const granted = await api.put(`/api/admin/admins/${bob.id}`).set(auth(superAdmin.token)).send({ role: "ADMIN" });
-    expect(granted.status).toBe(200);
-    expect((await api.get("/api/admin/me").set(auth(bob.token))).body.role).toBe("ADMIN");
-    expect((await api.put(`/api/admin/admins/${superAdmin.id}`).set(auth(superAdmin.token)).send({ role: "ADMIN" })).status).toBe(400);
-    expect((await api.put(`/api/admin/admins/${bob.id}`).set(auth(superAdmin.token)).send({ role: "OWNER" })).status).toBe(400);
-    expect((await api.delete(`/api/admin/admins/${bob.id}`).set(auth(superAdmin.token))).status).toBe(204);
-    expect((await api.get("/api/admin/me").set(auth(bob.token))).status).toBe(403);
-    const list = await api.get("/api/admin/admins").set(auth(superAdmin.token));
-    const ids = list.body.map((a: { userId: string }) => a.userId);
-    expect(ids).toEqual(expect.arrayContaining([admin.id, superAdmin.id]));
-    expect(ids).not.toContain(bob.id);
   });
 });
 
@@ -114,13 +97,10 @@ describe("pet moderation + public visibility", () => {
     expect((await api.get(`/api/pets/${petId}`)).status).toBe(200);
   });
 
-  it("hide / show is audited; repeating the same state → 409", async () => {
+  it("hide / show; repeating the same state → 409", async () => {
     expect((await api.patch(`/api/admin/pets/${petId}`).set(auth(admin.token)).send({ visibility: "HIDDEN", reason: "รายงานว่าเป็นสแปม" })).status).toBe(200);
     expect((await api.patch(`/api/admin/pets/${petId}`).set(auth(admin.token)).send({ visibility: "HIDDEN" })).status).toBe(409);
     expect((await api.patch(`/api/admin/pets/${petId}`).set(auth(admin.token)).send({ visibility: "VISIBLE" })).status).toBe(200);
-    const logs = await api.get(`/api/admin/audit-logs?targetType=pet&targetId=${petId}`).set(auth(admin.token));
-    expect(logs.body.items.map((l: { action: string }) => l.action)).toEqual(["pet.show", "pet.hide", "pet.approve", "pet.request_changes"]);
-    expect(logs.body.items[0]).toMatchObject({ actorName: "ผู้ดูแล", result: "SUCCESS" });
   });
 
   it("public APIs never expose phone numbers or messages", async () => {
@@ -159,10 +139,11 @@ describe("legacy approval (workflow off) → admin review queue", () => {
     expect((await api.post(`/api/adoptions/${caseId}/arrange`).set(auth(shelter))).status).toBe(404); // workflow ปิด
   });
 
-  it("admin contact note does not reset the owner's activity clock", async () => {
+  it("admin note does not reset the owner's activity clock", async () => {
     const before = (await prisma.adoptionRequest.findUniqueOrThrow({ where: { id: caseId } })).lastActivityAt;
-    expect((await api.post(`/api/admin/adoptions/${caseId}/follow-ups`).set(auth(admin.token)).send({ kind: "CONTACT" })).status).toBe(400);
-    const res = await api.post(`/api/admin/adoptions/${caseId}/follow-ups`).set(auth(admin.token)).send({ kind: "CONTACT", note: "โทรหาเจ้าของแล้ว ยังไม่ได้ส่งมอบ" });
+    expect((await api.post(`/api/admin/adoptions/${caseId}/follow-ups`).set(auth(admin.token)).send({ kind: "NOTE" })).status).toBe(400);
+    expect((await api.post(`/api/admin/adoptions/${caseId}/follow-ups`).set(auth(admin.token)).send({ kind: "CONTACT", note: "x" })).status).toBe(400); // รวมเป็น NOTE แล้ว
+    const res = await api.post(`/api/admin/adoptions/${caseId}/follow-ups`).set(auth(admin.token)).send({ kind: "NOTE", note: "โทรหาเจ้าของแล้ว ยังไม่ได้ส่งมอบ" });
     expect(res.status).toBe(201);
     expect((await prisma.adoptionRequest.findUniqueOrThrow({ where: { id: caseId } })).lastActivityAt).toEqual(before);
     // ข้อมูลระบบเดิมปิดธงเฉย ๆ ไม่ได้ ต้องตรวจผลส่งมอบ
@@ -199,32 +180,25 @@ describe("legacy approval (workflow off) → admin review queue", () => {
     expect(res.body.map((e: { label: string }) => e.label)).toEqual([
       "ส่งคำขอรับเลี้ยง",
       "เจ้าของอนุมัติ (ระบบเดิม) · รอผู้ดูแลยืนยันการส่งมอบ",
-      "บันทึกการติดต่อ",
+      "เพิ่มบันทึกติดตาม",
       "ผู้ดูแลตรวจแล้ว: ยังไม่ได้ส่งมอบจริง · ให้ดำเนินการส่งมอบต่อ",
       "เปิดเคสให้ดำเนินการต่อ",
     ]);
   });
 });
 
-describe("users + suspension", () => {
-  it("suspended user is blocked everywhere; admins cannot be suspended", async () => {
-    expect((await api.post(`/api/admin/users/${alice.id}/suspension`).set(auth(admin.token)).send({ reason: "" })).status).toBe(400);
-    const res = await api.post(`/api/admin/users/${alice.id}/suspension`).set(auth(admin.token)).send({ reason: "โพสต์ขายสัตว์ผิดนโยบาย" });
-    expect(res.body).toMatchObject({ suspended: true, suspendedReason: "โพสต์ขายสัตว์ผิดนโยบาย" });
-    expect((await api.get("/api/me/pets").set(auth(alice.token))).status).toBe(403);
-    expect((await api.post(`/api/admin/users/${superAdmin.id}/suspension`).set(auth(admin.token)).send({ reason: "ทดสอบระงับผู้ดูแล" })).status).toBe(403);
-    expect((await api.post(`/api/admin/users/${admin.id}/suspension`).set(auth(admin.token)).send({ reason: "ระงับตัวเองทดสอบ" })).status).toBe(400);
-
-    const suspended = await api.get("/api/admin/users?status=suspended").set(auth(admin.token));
-    expect(suspended.body.items.map((u: { id: string }) => u.id)).toEqual([alice.id]);
-    expect((await api.delete(`/api/admin/users/${alice.id}/suspension`).set(auth(admin.token))).status).toBe(200);
-    expect((await api.get("/api/me/pets").set(auth(alice.token))).status).toBe(200);
+describe("users overview", () => {
+  it("no suspension API (read-only user overview)", async () => {
+    expect((await api.post(`/api/admin/users/${alice.id}/suspension`).set(auth(admin.token)).send({ reason: "ทดสอบ" })).status).toBe(404);
+    const list = await api.get("/api/admin/users").set(auth(admin.token));
+    expect(list.status).toBe(200);
+    expect(list.body.items[0]).not.toHaveProperty("suspended");
   });
 
   it("user detail + filters", async () => {
     expect((await api.get("/api/admin/users/not-a-uuid").set(auth(admin.token))).status).toBe(404);
     const detail = await api.get(`/api/admin/users/${alice.id}`).set(auth(admin.token));
-    expect(detail.body).toMatchObject({ id: alice.id, role: "USER", suspended: false });
+    expect(detail.body).toMatchObject({ id: alice.id, role: "USER" });
     const admins = await api.get("/api/admin/users?role=SUPER_ADMIN").set(auth(admin.token));
     expect(admins.body.items.map((u: { id: string }) => u.id)).toEqual([superAdmin.id]);
   });
@@ -260,8 +234,6 @@ describe("announcements", () => {
     expect((await api.patch(`/api/admin/announcements/${id}`).set(auth(admin.token)).send({})).status).toBe(400);
     await api.patch(`/api/admin/announcements/${id}`).set(auth(admin.token)).send({ status: "DRAFT" });
     expect((await api.delete(`/api/admin/announcements/${id}`).set(auth(admin.token))).status).toBe(204);
-    const actions = (await api.get(`/api/admin/audit-logs?targetType=announcement&targetId=${id}`).set(auth(admin.token))).body.items.map((l: { action: string }) => l.action);
-    expect(actions).toEqual(["announcement.delete", "announcement.unpublish", "announcement.publish", "announcement.create"]);
   });
 
   it("USER cannot manage announcements", async () => {
@@ -269,36 +241,20 @@ describe("announcements", () => {
   });
 });
 
-describe("dashboard, reports, audit protection, cron", () => {
+describe("dashboard + removed endpoints", () => {
   it("dashboard counts come from the database", async () => {
     const res = await api.get("/api/admin/dashboard").set(auth(admin.token));
     expect(res.status).toBe(200);
     const total = await prisma.adoptionRequest.count();
     expect(Object.values(res.body.stages as Record<string, number>).reduce((a, b) => a + b, 0)).toBe(total);
     expect(res.body.stages.COMPLETED).toBe(await prisma.adoptionRequest.count({ where: { stage: "COMPLETED" } }));
-    expect(res.body.recentAudit).toHaveLength(5);
+    expect(res.body).not.toHaveProperty("recentAudit");
   });
 
-  it("reports: range validation + counts", async () => {
-    expect((await api.get("/api/admin/reports?from=2026-13-01").set(auth(admin.token))).status).toBe(400);
-    expect((await api.get("/api/admin/reports?from=2026-12-01&to=2026-11-01").set(auth(admin.token))).status).toBe(400);
-    const res = await api.get("/api/admin/reports").set(auth(admin.token));
-    expect(res.status).toBe(200);
-    expect(res.body.requests.completed).toBeGreaterThanOrEqual(1);
-    expect(res.body.pets.created).toBeGreaterThanOrEqual(3);
-  });
-
-  it("audit logs: read-only API, no secrets, append-only in the database", async () => {
-    expect((await api.delete("/api/admin/audit-logs").set(auth(superAdmin.token))).status).toBe(404);
-    expect((await api.patch("/api/admin/audit-logs/1").set(auth(superAdmin.token)).send({})).status).toBe(404);
-    expect((await api.get("/api/admin/audit-logs").set(auth(alice.token))).status).toBe(403);
-    const all = JSON.stringify((await api.get("/api/admin/audit-logs?limit=200").set(auth(superAdmin.token))).body);
-    expect(all).not.toMatch(/token-|refresh-|Bearer|password/);
-    await expect(prisma.$executeRaw`update public.admin_audit_logs set reason = 'แก้'`).rejects.toThrow(/append-only/);
-    await expect(prisma.$executeRaw`delete from public.admin_audit_logs`).rejects.toThrow(/append-only/);
-  });
-
-  it("cron endpoint is disabled without CRON_SECRET", async () => {
-    expect((await api.get("/api/internal/cron/follow-ups")).status).toBe(503);
+  it("reports, audit logs, escalate and cron endpoints were removed", async () => {
+    expect((await api.get("/api/admin/reports").set(auth(admin.token))).status).toBe(404);
+    expect((await api.get("/api/admin/audit-logs").set(auth(admin.token))).status).toBe(404);
+    expect((await api.post("/api/admin/adoptions/1/escalate").set(auth(admin.token)).send({})).status).toBe(404);
+    expect((await api.get("/api/internal/cron/follow-ups")).status).toBe(404);
   });
 });

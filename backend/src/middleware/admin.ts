@@ -2,7 +2,6 @@
 // ใช้ต่อจาก requireAuth เสมอ
 import type { RequestHandler, Response } from "express";
 import { prisma } from "../config/prisma.js";
-import { auditRepository } from "../repositories/audit.repository.js";
 import { currentUser } from "./auth.js";
 import { ApiError } from "./error.js";
 
@@ -16,16 +15,14 @@ const ADMIN_PERMISSIONS = [
   "adoptions.follow_up",
   "adoptions.resolve",
   "users.read",
-  "users.suspend",
   "announcements.manage",
-  "reports.read",
-  "audit.read",
 ] as const;
-export type Permission = (typeof ADMIN_PERMISSIONS)[number] | "admins.manage";
+export type Permission = (typeof ADMIN_PERMISSIONS)[number];
 
+// SUPER_ADMIN = ผู้ดูแลคนแรกจาก scripts/grant-super-admin.ts · สิทธิ์ในหน้า admin เท่ากัน
 export const PERMISSIONS: Record<AdminRole, readonly Permission[]> = {
   ADMIN: ADMIN_PERMISSIONS,
-  SUPER_ADMIN: [...ADMIN_PERMISSIONS, "admins.manage"],
+  SUPER_ADMIN: ADMIN_PERMISSIONS,
 };
 
 export interface Admin {
@@ -44,21 +41,10 @@ export const requireAdmin: RequestHandler = async (_req, res, next) => {
   next();
 };
 
-// ผู้ดูแลที่พยายามทำเกินสิทธิ์ → บันทึก DENIED ใน audit log แล้วตอบ 403
 export const requirePermission =
   (permission: Permission): RequestHandler =>
-  async (req, res, next) => {
-    const admin = currentAdmin(res);
-    if (!admin.permissions.includes(permission)) {
-      await auditRepository.record(prisma, admin, {
-        action: "permission.denied",
-        targetType: "route",
-        targetId: `${req.method} ${req.baseUrl}${req.route?.path ?? ""}`,
-        result: "DENIED",
-        changes: { permission },
-      });
-      throw new ApiError(403, "สิทธิ์ของคุณไม่พอสำหรับการกระทำนี้");
-    }
+  (_req, res, next) => {
+    if (!currentAdmin(res).permissions.includes(permission)) throw new ApiError(403, "สิทธิ์ของคุณไม่พอสำหรับการกระทำนี้");
     next();
   };
 

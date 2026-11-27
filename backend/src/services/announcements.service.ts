@@ -4,7 +4,6 @@ import type { Announcement } from "@prisma/client";
 import { prisma } from "../config/prisma.js";
 import type { Admin } from "../middleware/admin.js";
 import { ApiError } from "../middleware/error.js";
-import { auditRepository } from "../repositories/audit.repository.js";
 import type { AdminAnnouncement } from "../types/admin.js";
 import type { AnnouncementCreate, AnnouncementUpdate } from "../validators/admin.validator.js";
 import { notificationsService } from "./notifications.service.js";
@@ -56,11 +55,11 @@ function toData<T extends AnnouncementUpdate>(input: T) {
   };
 }
 
-// เผยแพร่ครั้งแรก → แจ้งเตือนในเว็บถึงผู้ใช้ทุกคนที่ไม่ถูกระงับ (ไม่ส่งอีเมล) · ประกาศตัวอย่าง (isDemo) ไม่แจ้ง
+// เผยแพร่ครั้งแรก → แจ้งเตือนในเว็บถึงผู้ใช้ทุกคน (ไม่ส่งอีเมล) · ประกาศตัวอย่าง (isDemo) ไม่แจ้ง
 // shortcut: สร้างแถวต่อผู้ใช้ใน transaction เดียว, ถ้าผู้ใช้เกินหลักหมื่นให้ย้ายไปทำเป็นงานเบื้องหลัง
 async function announceToUsers(tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0], row: Announcement) {
   if (row.isDemo) return;
-  const users = await tx.profile.findMany({ where: { suspension: { is: null } }, select: { id: true } });
+  const users = await tx.profile.findMany({ select: { id: true } });
   await notificationsService.notify(tx, users.map((u) => ({ recipientId: u.id, kind: "ANNOUNCEMENT_PUBLISHED" as const, announcementId: row.id })));
 }
 
@@ -85,7 +84,6 @@ export const announcementsService = {
       const row = await tx.announcement.create({
         data: { ...input, eventDate: toDate(input.eventDate), publishAt: toTime(input.publishAt), expireAt: toTime(input.expireAt), createdBy: admin.id, updatedBy: admin.id, publishedAt: input.status === "PUBLISHED" ? new Date() : null },
       });
-      await auditRepository.record(tx, admin, { action: "announcement.create", targetType: "announcement", targetId: row.id, changes: { title: row.title, status: row.status } });
       if (row.status === "PUBLISHED") await announceToUsers(tx, row);
       return toAnnouncement(row);
     });
@@ -101,24 +99,18 @@ export const announcementsService = {
         where: { id },
         data: { ...toData(input), updatedBy: admin.id, ...(publishing ? { publishedAt: new Date() } : {}), ...(input.status === "DRAFT" ? { publishedAt: null } : {}) },
       });
-      const changed = Object.fromEntries(
-        Object.keys(input).filter((k) => (before as Record<string, unknown>)[k] !== (row as Record<string, unknown>)[k]).map((k) => [k, true]),
-      );
-      const action = publishing ? "announcement.publish" : input.status === "DRAFT" && before.status === "PUBLISHED" ? "announcement.unpublish" : "announcement.update";
-      await auditRepository.record(tx, admin, { action, targetType: "announcement", targetId: id, changes: { fields: changed } });
       if (publishing) await announceToUsers(tx, row);
       return toAnnouncement(row);
     });
   },
 
   // ลบได้เฉพาะฉบับร่าง (ที่เผยแพร่แล้วต้องยกเลิกเผยแพร่ก่อน กันลบสิ่งที่ผู้ใช้กำลังเห็นโดยไม่ตั้งใจ)
-  remove(admin: Admin, id: number): Promise<void> {
+  remove(id: number): Promise<void> {
     return prisma.$transaction(async (tx) => {
       const row = await tx.announcement.findUnique({ where: { id } });
       if (!row) throw new ApiError(404, "ไม่พบประกาศ");
       if (row.status === "PUBLISHED") throw new ApiError(409, "ยกเลิกการเผยแพร่ก่อนลบประกาศ");
       await tx.announcement.delete({ where: { id } });
-      await auditRepository.record(tx, admin, { action: "announcement.delete", targetType: "announcement", targetId: id, changes: { title: row.title } });
     });
   },
 };

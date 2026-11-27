@@ -89,8 +89,6 @@ const schema = z.object({
   FOLLOW_UP_REMINDER_HOURS: hours(24),
   FOLLOW_UP_ADMIN_HOURS: hours(48),
   FOLLOW_UP_ESCALATION_HOURS: hours(72),
-  // Vercel Cron ส่ง "Authorization: Bearer <CRON_SECRET>" · ไม่ตั้ง = ปิด endpoint cron
-  CRON_SECRET: z.string().min(32, "CRON_SECRET ต้องยาวอย่างน้อย 32 ตัวอักษร").optional(),
 }).refine((e) => e.FOLLOW_UP_REMINDER_HOURS < e.FOLLOW_UP_ADMIN_HOURS && e.FOLLOW_UP_ADMIN_HOURS < e.FOLLOW_UP_ESCALATION_HOURS, {
   message: "FOLLOW_UP_*_HOURS ต้องเรียง REMINDER < ADMIN < ESCALATION",
 });

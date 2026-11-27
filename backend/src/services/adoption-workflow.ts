@@ -38,7 +38,6 @@ export interface FollowUpInput {
   stage: string;
   lastActivityAt: Date;
   followUpRequired: boolean;
-  escalated: boolean;
   disputed: boolean;
   legacyReview: boolean;
   closedAt: Date | null;
@@ -52,7 +51,7 @@ export function followUp(item: FollowUpInput, now: Date, policy: FollowUpPolicy)
   const open = !isTerminal(item.stage) && !item.closedAt;
   let priority: Priority = "normal";
   if (open) {
-    if (item.disputed || item.escalated || idle >= policy.escalationHours) priority = "urgent";
+    if (item.disputed || idle >= policy.escalationHours) priority = "urgent";
     else if (item.followUpRequired || item.legacyReview || idle >= policy.adminHours) priority = "high";
     else if (idle >= policy.reminderHours) priority = "reminder";
   } else if (item.legacyReview && !item.closedAt) {

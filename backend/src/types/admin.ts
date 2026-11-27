@@ -71,7 +71,6 @@ export interface AdminCase {
   createdAt: string;
   lastActivityAt: string;
   followUpRequired: boolean;
-  escalated: boolean;
   disputed: boolean;
   legacyReview: boolean;
   closedAt: string | null;
@@ -97,8 +96,6 @@ export interface AdminUser {
   id: string;
   name: string;
   role: AdminRoleName;
-  suspended: boolean;
-  suspendedReason: string;
   joinedAt: string;
   petCount: number;
   openRequestCount: number;
@@ -125,16 +122,3 @@ export interface AdminAnnouncement {
   updatedAt: string;
 }
 
-export interface AuditLogEntry {
-  id: string;
-  actorId: string | null;
-  actorName: string;
-  actorRole: string;
-  action: string;
-  targetType: string;
-  targetId: string;
-  result: string;
-  changes: unknown;
-  reason: string;
-  createdAt: string;
-}

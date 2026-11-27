@@ -13,10 +13,10 @@ cp .env.example .env      # Windows: copy .env.example .env
 npm run dev
 ```
 
-เปิด http://localhost:5173 · `npm test` = unit tests ของการต่ออายุ session (`src/api/client.test.ts`) กฎขั้นตอนของหน้าผู้ดูแล (`src/admin/workflow.test.ts`) และ Real Mode (`src/admin/real.test.ts`)
+เปิด http://localhost:5173 · `npm test` = unit tests ของการต่ออายุ session (`src/api/client.test.ts`) กฎขั้นตอนของหน้าผู้ดูแล (`src/admin/workflow.test.ts`) และชั้นข้อมูลของหน้าผู้ดูแล (`src/admin/real.test.ts`)
 
 - ตั้ง `VITE_API_URL=http://localhost:3000/api` แล้วรัน Backend (`cd backend && npm run dev`) — ดู [README หลัก](../README.md) · ไม่มีโหมดข้อมูลจำลอง
-- **หน้าผู้ดูแล** `/admin`: ข้อมูลจริงจาก `/api/admin/*` ต้องเข้าสู่ระบบด้วยบัญชีผู้ดูแล (Backend ตรวจสิทธิ์) · ต้องรัน migration 001 ก่อน — ดู [docs/admin-fullstack-implementation.md](../docs/admin-fullstack-implementation.md)
+- **หน้าผู้ดูแล** `/admin` (5 หน้า: ภาพรวม · จัดการสัตว์เลี้ยง · คำขอรับเลี้ยง · ผู้ใช้งาน · ประชาสัมพันธ์): ข้อมูลจริงจาก `/api/admin/*` ต้องเข้าสู่ระบบด้วยบัญชีผู้ดูแล (Backend ตรวจสิทธิ์ทุก request)
 - บัญชีทดลอง (รหัส `123456`) (เฉพาะฐานข้อมูล dev/ทดสอบที่ seed แล้ว): `pong@pawhome.test` (เจ้าของโพสต์มะลิ ส้มโอ ส้มจี๊ด) · `shelter@pawhome.test` · `mind@pawhome.test`
 
 ## โครงโฟลเดอร์
@@ -39,18 +39,18 @@ src/
 ├─ stores/               Zustand: useFilterStore (ตัวกรอง), useAuthStore (คนที่ล็อกอิน + token), useToastStore (แจ้งเตือน)
 ├─ layouts/RootLayout.tsx     Navbar (เปลี่ยนตามการล็อกอิน) + <Outlet /> + Footer + Toaster
 ├─ data/                 promos.ts (การ์ดข่าวสาร/ร่วมช่วยเหลือ/ผู้สนับสนุน + เนื้อหาหน้ารายละเอียด), guide.ts (เนื้อหาหน้าความรู้)
-├─ admin/                หน้าผู้ดูแล: workflow.ts · store.ts (Mock หรือว่างใน Real Mode) · api.ts + real.ts (Real Mode) · ui.tsx · หน้า Dashboard / Pets / Adoptions / People / Content / Reports / Settings
+├─ admin/                หน้าผู้ดูแล: AdminPreview.tsx (gate + layout) · api.ts + real.ts (โหลด/เรียก /api/admin/*) · store.ts · workflow.ts (กฎคิวติดตาม) · ui.tsx · หน้า Dashboard / Pets / Adoptions / People / Content
 ├─ components/HandoverPanel.tsx  ขั้นตอนส่งมอบหลังตอบรับ (เจ้าของ/ผู้ขอ): นัดส่งมอบ · รายงาน · ยืนยัน · แจ้งปัญหา · ไทม์ไลน์
-├─ api/site.ts · hooks/useSite.ts  /config · ประกาศหน้าแรก · แจ้งเตือนในเว็บ (ทนต่อ Backend รุ่นเดิม: 404 = ปิดฟีเจอร์)
+├─ hooks/useSite.ts     /config · ประกาศหน้าแรก · แจ้งเตือนในเว็บ
 ├─ components/           PetCard, PetList, FavoriteButton, AdoptionPanel, OwnerRequests, ImageUpload, UserMenu (avatar + เมนูบัญชี), AdStrip, Toaster, RequireAuth, Field ฯลฯ
 └─ pages/
    ├─ PetsPage.tsx       /              หน้าแรก: น้องที่ต้องการบ้านด่วน
    ├─ AllPetsPage.tsx    /pets          ฟีดน้องทั้งหมด + ตัวกรอง
-   ├─ PetDetailPage.tsx  /pets/:id      รายละเอียด, ♡, ขอรับเลี้ยง / (เจ้าของ) แก้ไข ลบ อนุมัติคำขอ
+   ├─ PetDetailPage.tsx  /pets/:id      รายละเอียด, ♡, ขอรับเลี้ยง + ส่งมอบ / (เจ้าของ) แก้ไข ลบ ตอบรับ-ปฏิเสธคำขอ
    ├─ PetFormPage.tsx    /pets/new      สร้าง + อัปโหลดรูป        🔒
    │                     /pets/:id/edit แก้ไข (เฉพาะเจ้าของ)       🔒
    ├─ FavoritesPage.tsx  /favorites     รายการโปรด                🔒
-   ├─ MyPage.tsx         /me            โพสต์ของฉัน / คำขอที่ยื่นไว้ / รายการโปรด  🔒
+   ├─ MyPage.tsx         /me            โพสต์ของฉัน / คำขอที่ยื่นไว้ / รายการโปรด / การแจ้งเตือน / โปรไฟล์  🔒
    ├─ GuidePage.tsx      /guide         ความรู้เบื้องต้นเรื่องหมาแมว
    ├─ PromoPage.tsx      /announcements/rabies-vaccine · /support/donate-food · /partners/spay-neuter
    │                     หน้ารายละเอียดของการ์ดในหน้าแรก (route สร้างจาก data/promos.ts อัตโนมัติ)

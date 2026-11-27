@@ -7,7 +7,6 @@
 // - ต้องพิมพ์ hostname ของฐานข้อมูลที่จะเขียนให้ตรง (กันรันผิดฐานข้อมูล) — สคริปต์แสดง host ให้ดูก่อนเสมอ
 // - บัญชี @pawhome.test (demo) ถูกปฏิเสธ เว้นแต่ใส่ --allow-demo (ใช้กับฐานข้อมูล dev/test เท่านั้น)
 // - มี SUPER_ADMIN อยู่แล้ว = หยุด (คนต่อไปให้ SUPER_ADMIN แต่งตั้งผ่าน PUT /api/admin/admins/:userId)
-// - บันทึก audit event "admin.bootstrap_super_admin" ใน transaction เดียวกัน
 // ดูขั้นตอนเต็ม: docs/admin-super-admin-bootstrap.md
 import type { PrismaClient } from "@prisma/client";
 import { pathToFileURL } from "node:url";
@@ -22,31 +21,18 @@ export async function bootstrapSuperAdmin(db: PrismaClient, options: { userId: s
 
   return db.$transaction(async (tx) => {
     const [account] = await tx.$queryRaw<{ email: string | null }[]>`select email from auth.users where id = ${userId}::uuid`;
-    const profile = await tx.profile.findUnique({ where: { id: userId }, include: { suspension: true, adminMembership: true } });
+    const profile = await tx.profile.findUnique({ where: { id: userId }, include: { adminMembership: true } });
     if (!account || !profile) throw new BootstrapError("ไม่พบบัญชีนี้ (ต้องสมัครและยืนยันอีเมลใน PawHome ก่อน)");
-    if (profile.suspension) throw new BootstrapError("บัญชีนี้ถูกระงับ แต่งตั้งไม่ได้");
     if (!allowDemo && account.email?.toLowerCase().endsWith("@pawhome.test")) {
       throw new BootstrapError("ปฏิเสธบัญชี demo (@pawhome.test) — ใส่ --allow-demo เฉพาะฐานข้อมูล dev/test");
     }
     const existing = await tx.adminMembership.findFirst({ where: { role: "SUPER_ADMIN" } });
-    if (existing) throw new BootstrapError("มี SUPER_ADMIN อยู่แล้ว — ให้ SUPER_ADMIN แต่งตั้งเพิ่มผ่านหน้า/API ผู้ดูแล");
+    if (existing) throw new BootstrapError("มี SUPER_ADMIN อยู่แล้ว (แต่งตั้งได้ครั้งเดียว)");
 
-    const before = profile.adminMembership?.role ?? "USER";
     await tx.adminMembership.upsert({
       where: { userId },
       create: { userId, role: "SUPER_ADMIN" },
       update: { role: "SUPER_ADMIN" },
-    });
-    await tx.adminAuditLog.create({
-      data: {
-        actorId: null,
-        actorRole: "BOOTSTRAP_SCRIPT",
-        action: "admin.bootstrap_super_admin",
-        targetType: "user",
-        targetId: userId,
-        changes: { role: { from: before, to: "SUPER_ADMIN" } },
-        reason: "แต่งตั้ง SUPER_ADMIN คนแรกด้วย scripts/grant-super-admin.ts",
-      },
     });
     return { userId, name: profile.name, email: account.email };
   });

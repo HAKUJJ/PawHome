@@ -7,8 +7,6 @@ with checks(check_name, expected, actual) as (
   union all
   select 'count: demo admins', '3', (select count(*) from public.admin_memberships m join auth.users u on u.id = m.user_id where u.email like 'demo-%@pawhome.test')::text
   union all
-  select 'count: demo suspended', '1', (select count(*) from public.user_suspensions s join auth.users u on u.id = s.user_id where u.email like 'demo-%@pawhome.test')::text
-  union all
   select 'count: pets', '100', (select count(*) from public.pets where id between 2001 and 2100)::text
   union all
   select 'count: pets AVAILABLE', '25', (select count(*) from public.pets where id between 2001 and 2100 and status = 'AVAILABLE')::text
@@ -62,8 +60,6 @@ with checks(check_name, expected, actual) as (
   select 'count: notifications', '569', (select count(*) from public.notification_events where id between 940001 and 949999)::text
   union all
   select 'count: unread notifications (personal)', '136', (select count(*) from public.notification_events where id between 940001 and 949999 and read_at is null and recipient_id is not null)::text
-  union all
-  select 'count: audit logs (dataset)', '100', (select count(*) from public.admin_audit_logs where changes ->> 'dataset' = 'pawhome-demo-v1')::text
 
   -- ไม่มีข้อมูลกำพร้า (FK ทุกตัวชี้ไปแถวที่มีอยู่)
   union all select 'orphan: pets without owner profile', '0', (select count(*) from public.pets p left join public.profiles o on o.id = p.owner_id where o.id is null)::text

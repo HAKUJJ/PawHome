@@ -81,7 +81,6 @@ export const ID_RANGES = {
   handoverReports: [920_001, 929_999],
   followUps: [930_001, 939_999],
   notifications: [940_001, 949_999],
-  auditLogs: [950_001, 959_999],
 } as const;
 
 // ---------- ชุดข้อมูลขนาดเล็กสำหรับสาธิต (database/seeds/minimal/) ----------
@@ -103,5 +102,4 @@ export const MINIMAL_ID_RANGES = {
   handoverReports: [961_001, 961_999],
   followUps: [962_001, 962_999],
   notifications: [963_001, 963_999],
-  auditLogs: [964_001, 964_999],
 } as const;

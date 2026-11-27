@@ -102,7 +102,7 @@ describe("announcements: schedule, expiry, fan-out", () => {
     await api.patch(`/api/admin/announcements/${live.id}`).set(auth(admin.token)).send({ status: "PUBLISHED" });
     const after = await prisma.notificationEvent.count({ where: { announcementId: live.id } });
     expect(before).toBe(0);
-    expect(after).toBe(await prisma.profile.count({ where: { suspension: { is: null } } }));
+    expect(after).toBe(await prisma.profile.count());
     // ยกเลิกแล้วเผยแพร่ใหม่ → ไม่สร้างแจ้งเตือนซ้ำ
     await api.patch(`/api/admin/announcements/${live.id}`).set(auth(admin.token)).send({ status: "DRAFT" });
     await api.patch(`/api/admin/announcements/${live.id}`).set(auth(admin.token)).send({ status: "PUBLISHED" });

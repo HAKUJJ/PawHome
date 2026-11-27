@@ -11,8 +11,7 @@
     "006-demo-handover.sql",
     "007-demo-followups.sql",
     "008-demo-announcements.sql",
-    "009-demo-notifications.sql",
-    "010-demo-audit.sql"
+    "009-demo-notifications.sql"
   ],
   "cleanup": "999-cleanup-demo.sql",
   "idRanges": {
@@ -43,10 +42,6 @@
     "notifications": [
       940001,
       949999
-    ],
-    "auditLogs": [
-      950001,
-      959999
     ]
   },
   "anchor": {
@@ -56,7 +51,6 @@
   "expected": {
     "users": 40,
     "admins": 3,
-    "suspended": 1,
     "pets": 100,
     "petsByStatus": {
       "AVAILABLE": 25,
@@ -90,7 +84,6 @@
     "followUps": 70,
     "announcements": 12,
     "notifications": 569,
-    "unreadNotifications": 136,
-    "auditLogs": 100
+    "unreadNotifications": 136
   }
 }

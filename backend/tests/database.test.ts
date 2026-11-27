@@ -64,7 +64,7 @@ describe("database/verification/verify-admin.sql", () => {
   const rows = inject("verifyAdminRows");
 
   it("has checks", () => {
-    expect(rows.length).toBeGreaterThan(20);
+    expect(rows.length).toBeGreaterThan(15);
   });
 
   it.each(rows.map((r) => [r.check_name, r] as const))("%s", (_name, row) => {
@@ -205,6 +205,27 @@ describe("migration 001 on legacy data", () => {
     await db.exec(unlock);
     expect(await access()).toBe(10);
     expect(await rows()).toEqual(before);
+    await db.close();
+  });
+
+  it("004 drops the unused audit/suspension tables only when empty, and rolls back", async () => {
+    const simplify = read("../../database/migrations/004_simplify_admin.sql");
+    const restore = read("../../database/migrations/004_simplify_admin.rollback.sql");
+    const db = await legacyDb();
+    for (const m of ["001_admin_workflow", "002_notifications_announcements", "003_admin_workflow_contract"]) await db.exec(read(`../../database/migrations/${m}.sql`));
+    const exists = async () => (await db.query<{ a: boolean; s: boolean }>(
+      "select to_regclass('public.admin_audit_logs') is not null as a, to_regclass('public.user_suspensions') is not null as s")).rows[0];
+    await db.exec("insert into public.admin_audit_logs (action, target_type) values ('x', 'y')");
+    await expect(db.exec(simplify)).rejects.toThrow(/refusing to drop/);
+    await db.exec("rollback");
+    expect(await exists()).toEqual({ a: true, s: true }); // ไม่มีอะไรถูกลบ
+    await db.exec("drop trigger admin_audit_logs_append_only on public.admin_audit_logs; delete from public.admin_audit_logs");
+    await db.exec(simplify);
+    await db.exec(simplify); // รันซ้ำได้
+    expect(await exists()).toEqual({ a: false, s: false });
+    await db.exec(restore);
+    expect(await exists()).toEqual({ a: true, s: true });
+    await expect(db.exec("insert into public.admin_audit_logs (action, target_type) values ('x', 'y'); delete from public.admin_audit_logs")).rejects.toThrow(/append-only/);
     await db.close();
   });
 

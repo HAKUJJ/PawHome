@@ -7,7 +7,7 @@ import type { Sex, Species } from "../types/pet";
 import type { AdminMe } from "./api";
 import { HOUR, isTerminal, type AdoptionCase } from "./workflow";
 
-export interface PreviewUser { id: string; name: string; role: "member" | "admin"; suspended: boolean; joinedAt: number; province: string }
+export interface PreviewUser { id: string; name: string; role: "member" | "admin"; joinedAt: number; province: string }
 // review = รอตรวจ · changes = ส่งกลับให้เจ้าของแก้ไข (เหตุผลใน reviewNote)
 export type Visibility = "visible" | "hidden" | "review" | "changes";
 export interface PreviewPet {
@@ -19,21 +19,18 @@ export interface Announcement {
   id: string; title: string; category: string; description: string; date: string; time: string; location: string;
   contact: string; cta: string; destination: string; published: boolean; order: number;
 }
-export interface Audit { id: string; actor: string; action: string; target: string; at: number; category: "เคส" | "สัตว์เลี้ยง" | "ผู้ใช้" | "ประกาศ" | "ระบบ"; note?: string }
-export interface Preferences {
-  name: string; density: "regular" | "compact"; trends: boolean;
-  showQuickActions: boolean;
-}
+// ชื่อที่แสดงบนหัวหน้าผู้ดูแล (มาจากบัญชีผ่าน /api/admin/me)
+export interface Preferences { name: string }
 export interface PreviewData {
   users: PreviewUser[]; pets: PreviewPet[]; cases: AdoptionCase[]; announcements: Announcement[];
-  logs: Audit[]; preferences: Preferences;
+  preferences: Preferences;
 }
 
 // สถานะการยืนยันสิทธิ์กับ Backend
 export type AdminStatus = "checking" | "ready" | "unauthorized" | "forbidden" | "error";
 
-const defaultPreferences = (): Preferences => ({ name: "ผู้ดูแล PawHome", density: "regular", trends: true, showQuickActions: true });
-const emptyData = (): PreviewData => ({ users: [], pets: [], cases: [], announcements: [], logs: [], preferences: defaultPreferences() });
+const defaultPreferences = (): Preferences => ({ name: "ผู้ดูแล PawHome" });
+const emptyData = (): PreviewData => ({ users: [], pets: [], cases: [], announcements: [], preferences: defaultPreferences() });
 
 type State = PreviewData & { status: AdminStatus; error?: string; me?: AdminMe };
 

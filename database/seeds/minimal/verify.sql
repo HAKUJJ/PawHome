@@ -16,7 +16,6 @@ checks(check_name, expected, actual) as (
   union all select 'count: follow-up cases', '3', (select count(distinct request_id) from public.adoption_follow_ups where id between 962001 and 962999)::text
   union all select 'count: announcements', '3', (select count(*) from public.announcements where id between 601 and 603)::text
   union all select 'count: notifications', '16', (select count(*) from public.notification_events where id between 963001 and 963999)::text
-  union all select 'count: audit logs', '10', (select count(*) from public.admin_audit_logs where changes ->> 'dataset' = 'pawhome-demo-minimal-v1')::text
 
   -- 10 สถานการณ์สาธิต
   union all select 'scenario 1: pet waiting with no requests', '1', (select count(*) from p where status = 'AVAILABLE' and not exists (select 1 from public.adoption_requests x where x.pet_id = p.id))::text
@@ -28,9 +27,8 @@ checks(check_name, expected, actual) as (
   union all select 'scenario 7: owner silent > 48h (in follow-up queue)', '1', (select count(*) from r where stage = 'PENDING' and last_activity_at < now() - interval '48 hours' and follow_up_required)::text
   union all select 'scenario 8: conflicting reports → disputed', '1', (select count(*) from r where disputed and stage = 'HANDOVER_REPORTED')::text
   union all select 'scenario 9: rejected and cancelled requests', 'true', (exists (select 1 from r where stage = 'REJECTED') and exists (select 1 from r where stage = 'CANCELLED'))::text
-  union all select 'scenario 10: admin follow-up recorded in notes + audit', 'true', (
-    exists (select 1 from public.adoption_follow_ups where id between 962001 and 962999 and kind = 'CONTACT')
-    and exists (select 1 from public.admin_audit_logs where changes ->> 'dataset' = 'pawhome-demo-minimal-v1' and action = 'adoption.contact'))::text
+  union all select 'scenario 10: admin follow-up recorded in notes', 'true', (
+    exists (select 1 from public.adoption_follow_ups where id between 962001 and 962999 and kind = 'CONTACT'))::text
 
   -- สถานะน้องตรงกับคำขอ
   union all select 'pet status: matches requests', '0', (select count(*) from p where status <> case
