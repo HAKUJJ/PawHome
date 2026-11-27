@@ -1,6 +1,6 @@
 // Browser E2E ของเว็บสาธารณะ + ผู้ดูแล บนชุดข้อมูลทดสอบ (Chromium → Vite → Express จริง → PGlite, Auth ปลอม)
 // ครอบคลุม: สมัคร · ค้นหา · รายการโปรด · สร้าง/แก้โพสต์ · ขอรับเลี้ยง · ตอบรับ · นัดส่งมอบ · รายงาน · ข้อพิพาท · ยืนยัน
-//           ผู้ดูแลตรวจผล · แจ้งเตือน · ประกาศหน้าแรก · ภาพรวมผู้ดูแล · มือถือ 390px
+//           ผู้ดูแลตรวจผล · แจ้งเตือน · ภาพรวมผู้ดูแล · มือถือ 390px
 //   1) cd backend && E2E_DEMO_DATASET=1 E2E_HANDOVER_WORKFLOW=1 npx tsx --import ./tests/e2e/loader.mjs tests/e2e/server.ts
 //   2) cd frontend && VITE_API_URL=http://localhost:3101/api npx vite --port 5182
 //   3) PAWHOME_PLAYWRIGHT=/path/to/playwright/index.mjs node scripts/public-workflow.e2e.mjs
@@ -171,25 +171,6 @@ await step("applicant sees completion in the panel and notifications; timeline i
   await applicant.getByText("รับเลี้ยงสำเร็จ", { exact: true }).first().waitFor();
   await applicant.getByRole("button", { name: "อ่านทั้งหมดแล้ว" }).click();
   await applicant.getByText("ยังไม่อ่าน 0 รายการ").waitFor();
-});
-
-await step("admin publishes an announcement → it appears on the home page", async () => {
-  await admin.goto(`${base}/admin/announcements`);
-  await admin.getByRole("button", { name: "สร้างประกาศ" }).click();
-  const dialog = admin.getByRole("dialog", { name: "สร้างประกาศ" });
-  await dialog.getByLabel("ชื่อประกาศ").fill("ประกาศจาก E2E หน้าแรก");
-  await dialog.getByLabel("รายละเอียด").fill("ทดสอบการแสดงบนหน้าแรก");
-  await dialog.getByLabel("ปลายทางปุ่ม (path ในเว็บ)").fill("/pets");
-  await dialog.getByLabel(/เผยแพร่ทันที/).check();
-  await dialog.getByRole("button", { name: "บันทึก", exact: true }).click();
-  await admin.getByText("สร้างประกาศแล้ว").first().waitFor();
-  const token = await tokenOf(ADMIN);
-  const created = (await api("/admin/announcements", { token })).body.find((a) => a.title === "ประกาศจาก E2E หน้าแรก");
-  await api(`/admin/announcements/${created.id}`, { token, method: "PATCH", body: { displayOrder: 0 } });
-  const page = await browser.newPage();
-  await page.goto(`${base}/`);
-  await page.getByRole("link", { name: /ประกาศจาก E2E หน้าแรก/ }).waitFor();
-  await page.close();
 });
 
 await step("admin dashboard reads the seeded dataset", async () => {

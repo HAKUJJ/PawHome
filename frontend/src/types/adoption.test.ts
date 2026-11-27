@@ -42,14 +42,13 @@ describe("reportsMatch", () => {
 describe("site API against an older Backend", () => {
   afterEach(() => vi.resetModules());
 
-  it("404 from /config, /announcements, /me/notifications → feature off, no error", async () => {
+  it("404 from /config, /me/notifications → feature off, no error", async () => {
     vi.doMock("../api/client", async () => {
       const actual = await vi.importActual<typeof import("../api/client")>("../api/client");
       return { ...actual, request: () => Promise.reject(new actual.ApiError(404, "ไม่พบ API นี้")) };
     });
     const site = await import("../api/site");
     expect(await site.getSiteConfig()).toEqual({ adoptionHandoverWorkflow: false });
-    expect(await site.getPublicAnnouncements()).toEqual([]);
     expect(await site.getNotifications()).toEqual({ unread: 0, items: [] });
   });
 

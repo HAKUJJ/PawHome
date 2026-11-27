@@ -134,27 +134,12 @@ await step("users: read-only overview (posts + requests, no suspension)", async 
   assert.equal((await api("/me/pets", { token: pong })).status, 200);
 });
 
-await step("announcements: create + publish → visible on the public API", async () => {
-  await page.keyboard.press("Escape");
-  await page.goto(`${base}/admin/announcements`);
-  await page.getByRole("button", { name: "สร้างประกาศ" }).click();
-  const dialog = page.getByRole("dialog", { name: "สร้างประกาศ" });
-  await dialog.getByLabel("ชื่อประกาศ").fill("ประกาศ E2E");
-  await dialog.getByLabel("รายละเอียด").fill("ทดสอบการเผยแพร่จากหน้าผู้ดูแล");
-  await dialog.getByLabel("ปลายทางปุ่ม (path ในเว็บ)").fill("/pets");
-  await dialog.getByLabel(/เผยแพร่ทันที/).check();
-  await dialog.getByRole("button", { name: "บันทึก", exact: true }).click();
-  await page.getByText("สร้างประกาศแล้ว").first().waitFor();
-  const published = (await api("/announcements")).body;
-  assert.ok(published.some((a) => a.title === "ประกาศ E2E" && a.destination === "/pets"));
-});
-
-await step("admin menu has only the five pages (no reports / settings / audit)", async () => {
+await step("admin menu has only the four pages (no reports / settings / audit / announcements)", async () => {
   await page.goto(`${base}/admin`);
   await h1(page, "ภาพรวม");
   const nav = page.locator(".ad-sidebar");
-  for (const label of ["ภาพรวม", "จัดการสัตว์เลี้ยง", "คำขอรับเลี้ยง", "ผู้ใช้งาน", "ประชาสัมพันธ์"]) await nav.getByRole("link", { name: label }).waitFor();
-  assert.equal(await nav.getByRole("link", { name: /รายงาน|ตั้งค่า/ }).count(), 0);
+  for (const label of ["ภาพรวม", "จัดการสัตว์เลี้ยง", "คำขอรับเลี้ยง", "ผู้ใช้งาน"]) await nav.getByRole("link", { name: label }).waitFor();
+  assert.equal(await nav.getByRole("link", { name: /รายงาน|ตั้งค่า|ประชาสัมพันธ์/ }).count(), 0);
   assert.equal(await page.getByText("กิจกรรมผู้ใช้ล่าสุด").count(), 0);
   await page.goto(`${base}/admin/reports`);
   await page.getByText("ไม่พบหน้าผู้ดูแลนี้").waitFor();

@@ -7,7 +7,6 @@ import { petsController } from "../controllers/pets.controller.js";
 import { uploadsController } from "../controllers/uploads.controller.js";
 import { env } from "../config/env.js";
 import { currentUser, optionalAuth, requireAuth } from "../middleware/auth.js";
-import { announcementsService } from "../services/announcements.service.js";
 import { followUpPolicy } from "../services/follow-up.service.js";
 import { notificationsService } from "../services/notifications.service.js";
 import { z } from "zod";
@@ -70,11 +69,6 @@ routes.post("/adoptions/:id/dispute", requireAuth, adoptionsController.dispute);
 // ---- ค่าตั้งที่หน้าเว็บต้องรู้ (ไม่มีความลับ) ----
 routes.get("/config", (_req, res) => {
   res.json({ adoptionHandoverWorkflow: env.ADOPTION_HANDOVER_WORKFLOW, followUp: followUpPolicy });
-});
-
-// ---- ประกาศ (สาธารณะ: เฉพาะที่เผยแพร่แล้วและอยู่ในช่วงเวลา) ----
-routes.get("/announcements", async (_req, res) => {
-  res.json(await announcementsService.listPublished());
 });
 
 // ---- ผู้ดูแล ----

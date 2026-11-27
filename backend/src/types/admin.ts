@@ -101,24 +101,4 @@ export interface AdminUser {
   openRequestCount: number;
 }
 
-export interface AdminAnnouncement {
-  id: number;
-  title: string;
-  category: string;
-  description: string;
-  eventDate: string | null;
-  eventTime: string;
-  location: string;
-  contact: string;
-  cta: string;
-  destination: string;
-  imageUrl: string;
-  status: "DRAFT" | "PUBLISHED";
-  displayOrder: number;
-  isDemo: boolean;
-  publishedAt: string | null;
-  publishAt: string | null;
-  expireAt: string | null;
-  updatedAt: string;
-}
 

@@ -61,41 +61,9 @@ export const userFiltersSchema = z.object({
   role: z.enum(["USER", "ADMIN", "SUPER_ADMIN"]).optional(),
 });
 
-// ปลายทางในเว็บเท่านั้น ("/" หรือ "/path") — ตรงกับ check constraint ในฐานข้อมูล
-export const SAFE_DESTINATION = /^\/([A-Za-z0-9._~-][A-Za-z0-9._~/?=&#%-]*)?$/;
-
-const announcementFields = {
-  title: z.string({ required_error: "กรุณากรอกชื่อประกาศ" }).trim().min(1, "กรุณากรอกชื่อประกาศ").max(200),
-  category: z.string().trim().max(60).default(""),
-  description: z.string().trim().max(5000).default(""),
-  eventDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "วันที่ต้องเป็นรูปแบบ YYYY-MM-DD").nullable().default(null),
-  eventTime: z.string().trim().max(60).default(""),
-  location: z.string().trim().max(300).default(""),
-  contact: z.string().trim().max(500).default(""),
-  cta: z.string().trim().max(60).default(""),
-  destination: z.string().trim().regex(SAFE_DESTINATION, "ปลายทางต้องเป็นลิงก์ภายในเว็บ เช่น /pets").default("/"),
-  imageUrl: z.string().trim().max(2048).default(""),
-  status: z.enum(["DRAFT", "PUBLISHED"]).default("DRAFT"),
-  displayOrder: z.coerce.number().int().min(0).max(10_000).default(0),
-  isDemo: z.boolean().default(false),
-  // ตั้งเวลาเผยแพร่ / หมดอายุ (ISO datetime) · null = ไม่กำหนด
-  publishAt: z.string().datetime({ offset: true, message: "publishAt ต้องเป็นวันเวลา ISO" }).nullable().default(null),
-  expireAt: z.string().datetime({ offset: true, message: "expireAt ต้องเป็นวันเวลา ISO" }).nullable().default(null),
-};
-
-const windowOk = (v: { publishAt?: string | null; expireAt?: string | null }) => !v.publishAt || !v.expireAt || new Date(v.expireAt) > new Date(v.publishAt);
-export const announcementCreateSchema = z.object(announcementFields).refine(windowOk, { message: "วันหมดอายุต้องหลังวันเผยแพร่", path: ["expireAt"] });
-// PATCH: ส่งเฉพาะฟิลด์ที่จะแก้ — optional ข้าม default ของฟิลด์ที่ไม่ได้ส่ง (ไม่เขียนทับเป็นค่าเริ่มต้น)
-export const announcementUpdateSchema = z.object(announcementFields)
-  .partial()
-  .refine(windowOk, { message: "วันหมดอายุต้องหลังวันเผยแพร่", path: ["expireAt"] })
-  .refine((v) => Object.values(v).some((x) => x !== undefined), { message: "ไม่มีข้อมูลที่จะแก้ไข" });
-
 export type CaseFilters = z.infer<typeof caseFiltersSchema>;
 export type FollowUpInput = z.infer<typeof followUpSchema>;
 export type ReviewHandoverInput = z.infer<typeof reviewHandoverSchema>;
 export type PetFiltersAdmin = z.infer<typeof petFiltersAdminSchema>;
 export type ModerationInput = z.infer<typeof moderationSchema>;
 export type UserFilters = z.infer<typeof userFiltersSchema>;
-export type AnnouncementCreate = z.infer<typeof announcementCreateSchema>;
-export type AnnouncementUpdate = z.infer<typeof announcementUpdateSchema>;

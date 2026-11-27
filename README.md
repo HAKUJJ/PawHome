@@ -20,11 +20,10 @@ PawHome เป็นเว็บแอป Full-Stack (โปรเจกต์ F
 - โพสต์ / แก้ไข / ลบน้อง พร้อมอัปโหลดรูป (ตรวจชนิดไฟล์จากไบต์จริง ≤ 2 MB · เปลี่ยน/ลบโพสต์แล้วลบรูปเก่าใน Storage ให้)
 - รายการโปรด (♡)
 - คำขอรับเลี้ยง: ยื่น · ยกเลิก · เจ้าของตอบรับหรือปฏิเสธ · นัดส่งมอบ · รายงานการส่งมอบสองฝ่าย · ยืนยัน · แจ้งข้อพิพาท · ไทม์ไลน์ ([ขั้นตอน](#-adoption-workflow))
-- แจ้งเตือนในเว็บ: แท็บ "การแจ้งเตือน" ในหน้า "ของฉัน" + ตัวนับบนเมนูบัญชี · สร้างตามเหตุการณ์ของคำขอและประกาศ (ไม่ส่งอีเมล/SMS)
-- ประกาศหน้าแรกจากหน้าผู้ดูแล (ตั้งเวลาเผยแพร่/หมดอายุได้) · ยังไม่มีประกาศ → การ์ดตัวอย่าง 3 ใบที่มีป้าย "ตัวอย่าง"
+- แจ้งเตือนในเว็บ: แท็บ "การแจ้งเตือน" ในหน้า "ของฉัน" + ตัวนับบนเมนูบัญชี · สร้างตามเหตุการณ์ของคำขอ (ไม่ส่งอีเมล/SMS)
 - หน้าความรู้เบื้องต้น
 
-### หน้าผู้ดูแล `/admin` (5 หน้า)
+### หน้าผู้ดูแล `/admin` (4 หน้า)
 
 | หน้า | ทำอะไรได้ |
 | --- | --- |
@@ -32,7 +31,6 @@ PawHome เป็นเว็บแอป Full-Stack (โปรเจกต์ F
 | จัดการสัตว์เลี้ยง | ตรวจโพสต์ · ส่งกลับให้แก้พร้อมเหตุผล · ซ่อน/แสดงโพสต์ (ไม่ลบข้อมูล) |
 | คำขอรับเลี้ยง | คิวเรียงตามความเร่งด่วน (เจ้าของเงียบ 24 / 48 / 72 ชม.) · ตั้งธง · บันทึกติดตาม · ตรวจข้อพิพาทพร้อมเหตุผล · ตรวจคำขอที่อนุมัติจากระบบเดิม · ปิดเคส |
 | ผู้ใช้งาน | ภาพรวมสมาชิก โพสต์ และประวัติคำขอ (อ่านอย่างเดียว · ไม่แสดงอีเมล/เบอร์โทร) |
-| ประชาสัมพันธ์ | สร้าง / แก้ไข / เผยแพร่ / จัดลำดับ / ลบประกาศฉบับร่าง |
 
 สิทธิ์ผู้ดูแลอ่านจากตาราง `admin_memberships` ทุก request · ผู้ดูแลคนแรกแต่งตั้งด้วยสคริปต์ `npm run admin:bootstrap` (ขั้นตอน) · ไม่มี API ให้แต่งตั้งตัวเอง
 
@@ -71,7 +69,7 @@ flowchart LR
 PawHome/
 ├─ frontend/        Vite + React + TS
 │  ├─ src/pages/    หน้าเว็บสาธารณะ
-│  ├─ src/admin/    หน้าผู้ดูแล 5 หน้า (ข้อมูลจาก /api/admin/*)
+│  ├─ src/admin/    หน้าผู้ดูแล 4 หน้า (ข้อมูลจาก /api/admin/*)
 │  └─ scripts/      E2E (Playwright)
 ├─ backend/         Express + Prisma + Zod
 │  ├─ src/          routes → controllers → services → repositories
@@ -160,9 +158,8 @@ npm run dev                 # http://localhost:5173
 | คำขอรับเลี้ยง 🔒 | `POST /pets/:id/adoptions` · `GET /pets/:id/adoptions` (เจ้าของ) · `PATCH /adoptions/:id` (ตอบรับ/ปฏิเสธ) · `DELETE /adoptions/:id` (ยกเลิก) · `GET /adoptions/:id` · `GET /adoptions/:id/timeline` |
 | ส่งมอบ 🔒 | `POST /adoptions/:id/arrange` · `POST /adoptions/:id/handover-reports` · `POST /adoptions/:id/confirm` · `POST /adoptions/:id/dispute` (เมื่อ `ADOPTION_HANDOVER_WORKFLOW=true`) |
 | แจ้งเตือน 🔒 | `GET /me/notifications` · `PATCH /me/notifications/:id/read` · `POST /me/notifications/read-all` |
-| ประกาศ | `GET /announcements` |
 | อัปโหลด 🔒 | `POST /uploads` (multipart ช่อง `image`) |
-| ผู้ดูแล 🔒 | `GET /admin/me` · `GET /admin/dashboard` · `/admin/pets` (+ `/:id`, `/:id/moderation`) · `/admin/adoptions` (+ `/:id`, `/:id/timeline`, `/:id/follow-ups`, `/:id/review-handover`, `/:id/close`) · `GET /admin/users` (+ `/:id`) · `/admin/announcements` (+ `/:id`) |
+| ผู้ดูแล 🔒 | `GET /admin/me` · `GET /admin/dashboard` · `/admin/pets` (+ `/:id`, `/:id/moderation`) · `/admin/adoptions` (+ `/:id`, `/:id/timeline`, `/:id/follow-ups`, `/:id/review-handover`, `/:id/close`) · `GET /admin/users` (+ `/:id`) |
 
 รายชื่อ route ล่าสุด: [backend/src/routes/index.ts](backend/src/routes/index.ts) · [backend/src/routes/admin.ts](backend/src/routes/admin.ts)
 

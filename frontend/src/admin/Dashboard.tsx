@@ -20,7 +20,6 @@ export function metrics(data: PreviewData) {
     pets: data.pets.length,
     users: data.users.length,
     review: data.pets.filter((pet) => pet.visibility === "review").length,
-    published: data.announcements.filter((entry) => entry.published).length,
   };
 }
 
@@ -90,14 +89,12 @@ export function Dashboard() {
       <StatCard tone="warning" label="โพสต์ที่ต้องตรวจสอบ" value={stats.review} icon="clipboard" to="/admin/pets?status=review" />
       <StatCard label="สัตว์ทั้งหมด" value={stats.pets} icon="paw" to="/admin/pets" />
       <StatCard label="ผู้ใช้งาน" value={stats.users} icon="users" to="/admin/users" />
-      <StatCard label="ประกาศที่เผยแพร่" value={stats.published} icon="megaphone" to="/admin/announcements" />
     </div>
 
     <Card title="ทางลัด">
       <div className="ad-row">
         <Link className="ad-btn ad-btn-primary" to="/admin/adoptions?filter=overdue">ติดตามเคสเกินเวลา</Link>
         <Link className="ad-btn" to="/admin/pets?status=review">ตรวจโพสต์ใหม่ ({stats.review})</Link>
-        <Link className="ad-btn" to="/admin/announcements">จัดการประกาศ</Link>
       </div>
     </Card>
 
@@ -120,11 +117,6 @@ export function Dashboard() {
             <Badge tone={stageTone(item)}>{stageLabel[item.stage]}</Badge>
           </li>;
         })}</ul>
-      </Card>
-      <Card title="ประชาสัมพันธ์" action={<Link className="ad-btn-link" to="/admin/announcements">จัดการ →</Link>}>
-        <ul className="ad-list">{[...data.announcements].sort((a, b) => a.order - b.order).map((entry) => <li key={entry.id}>
-          <span className="ad-min0">{entry.title}</span><Badge tone={entry.published ? "success" : "neutral"}>{entry.published ? "เผยแพร่" : "ฉบับร่าง"}</Badge>
-        </li>)}</ul>
       </Card>
     </div>
 

@@ -27,8 +27,4 @@ adminRoutes.post("/adoptions/:id/close", can("adoptions.resolve"), c.closeCase);
 adminRoutes.get("/users", can("users.read"), c.listUsers);
 adminRoutes.get("/users/:id", can("users.read"), c.getUser);
 
-adminRoutes.get("/announcements", can("announcements.manage"), c.listAnnouncements);
-adminRoutes.post("/announcements", can("announcements.manage"), c.createAnnouncement);
-adminRoutes.patch("/announcements/:id", can("announcements.manage"), c.updateAnnouncement);
-adminRoutes.delete("/announcements/:id", can("announcements.manage"), c.deleteAnnouncement);
 

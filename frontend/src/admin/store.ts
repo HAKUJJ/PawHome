@@ -15,14 +15,10 @@ export interface PreviewPet {
   imageUrl: string; visibility: Visibility; createdAt: number; description: string; vaccinated: boolean; sterilized: boolean;
   reviewNote?: string;
 }
-export interface Announcement {
-  id: string; title: string; category: string; description: string; date: string; time: string; location: string;
-  contact: string; cta: string; destination: string; published: boolean; order: number;
-}
 // ชื่อที่แสดงบนหัวหน้าผู้ดูแล (มาจากบัญชีผ่าน /api/admin/me)
 export interface Preferences { name: string }
 export interface PreviewData {
-  users: PreviewUser[]; pets: PreviewPet[]; cases: AdoptionCase[]; announcements: Announcement[];
+  users: PreviewUser[]; pets: PreviewPet[]; cases: AdoptionCase[];
   preferences: Preferences;
 }
 
@@ -30,7 +26,7 @@ export interface PreviewData {
 export type AdminStatus = "checking" | "ready" | "unauthorized" | "forbidden" | "error";
 
 const defaultPreferences = (): Preferences => ({ name: "ผู้ดูแล PawHome" });
-const emptyData = (): PreviewData => ({ users: [], pets: [], cases: [], announcements: [], preferences: defaultPreferences() });
+const emptyData = (): PreviewData => ({ users: [], pets: [], cases: [], preferences: defaultPreferences() });
 
 type State = PreviewData & { status: AdminStatus; error?: string; me?: AdminMe };
 

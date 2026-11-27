@@ -1,7 +1,6 @@
 // =========================================================
 // ข้อมูลประกอบหน้าเว็บจาก Backend รุ่นใหม่ (ทนต่อ Backend รุ่นเดิมที่ยังไม่มี endpoint เหล่านี้)
 //   GET   /config                       ขั้นตอนส่งมอบเปิดอยู่ไหม
-//   GET   /announcements                ประกาศที่เผยแพร่แล้ว (สาธารณะ)
 //   GET   /me/notifications             แจ้งเตือนในเว็บของฉัน + จำนวนที่ยังไม่อ่าน
 //   PATCH /me/notifications/:id/read    อ่านแล้ว 1 รายการ
 //   POST  /me/notifications/read-all    อ่านแล้วทั้งหมด
@@ -10,16 +9,6 @@ import { ApiError, request } from "./client";
 
 export interface SiteConfig {
   adoptionHandoverWorkflow: boolean;
-}
-
-export interface PublicAnnouncement {
-  id: number;
-  title: string;
-  category: string;
-  description: string;
-  cta: string;
-  destination: string;
-  isDemo: boolean;
 }
 
 export interface NotificationItem {
@@ -47,15 +36,6 @@ export async function getSiteConfig(): Promise<SiteConfig> {
     return await request<SiteConfig>("/config");
   } catch (error) {
     if (missing(error)) return { adoptionHandoverWorkflow: false };
-    throw error;
-  }
-}
-
-export async function getPublicAnnouncements(): Promise<PublicAnnouncement[]> {
-  try {
-    return await request<PublicAnnouncement[]>("/announcements");
-  } catch (error) {
-    if (missing(error)) return [];
     throw error;
   }
 }

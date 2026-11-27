@@ -88,32 +88,3 @@ describe("participant detail + timeline", () => {
   });
 });
 
-describe("announcements: schedule, expiry, fan-out", () => {
-  it("scheduled / expired are hidden publicly; publishing notifies users once; demo does not notify", async () => {
-    const future = new Date(Date.now() + 86_400_000).toISOString();
-    const past = new Date(Date.now() - 86_400_000).toISOString();
-    const create = (body: object) => api.post("/api/admin/announcements").set(auth(admin.token)).send(body);
-    const scheduled = (await create({ title: "ตั้งเวลาไว้", status: "PUBLISHED", publishAt: future, isDemo: true })).body;
-    const expired = (await create({ title: "หมดอายุแล้ว", status: "PUBLISHED", expireAt: past, isDemo: true })).body;
-    expect((await create({ title: "ช่วงเวลาผิด", publishAt: future, expireAt: past })).status).toBe(400);
-    const live = (await create({ title: "ประกาศใช้งานจริง", status: "DRAFT" })).body;
-
-    const before = await prisma.notificationEvent.count({ where: { announcementId: live.id } });
-    await api.patch(`/api/admin/announcements/${live.id}`).set(auth(admin.token)).send({ status: "PUBLISHED" });
-    const after = await prisma.notificationEvent.count({ where: { announcementId: live.id } });
-    expect(before).toBe(0);
-    expect(after).toBe(await prisma.profile.count());
-    // ยกเลิกแล้วเผยแพร่ใหม่ → ไม่สร้างแจ้งเตือนซ้ำ
-    await api.patch(`/api/admin/announcements/${live.id}`).set(auth(admin.token)).send({ status: "DRAFT" });
-    await api.patch(`/api/admin/announcements/${live.id}`).set(auth(admin.token)).send({ status: "PUBLISHED" });
-    expect(await prisma.notificationEvent.count({ where: { announcementId: live.id } })).toBe(after);
-    expect(await prisma.notificationEvent.count({ where: { announcementId: { in: [scheduled.id, expired.id] } } })).toBe(0);
-
-    const ids = (await api.get("/api/announcements")).body.map((a: { id: number }) => a.id);
-    expect(ids).toContain(live.id);
-    expect(ids).not.toContain(scheduled.id);
-    expect(ids).not.toContain(expired.id);
-    const ownerItem = (await inbox(owner.token)).items.find((n) => n.kind === "ANNOUNCEMENT_PUBLISHED")!;
-    expect(ownerItem).toMatchObject({ title: "ประกาศใหม่จาก PawHome", link: "/" });
-  });
-});

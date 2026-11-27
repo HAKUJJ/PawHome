@@ -7,7 +7,6 @@ import PawLogo from "../components/PawLogo";
 import Toaster from "../components/Toaster";
 import { useAuthStore } from "../stores/useAuthStore";
 import { AdoptionList, CaseDetail } from "./Adoptions";
-import { Announcements } from "./Content";
 import { Dashboard } from "./Dashboard";
 import { Users } from "./People";
 import { Pets } from "./Pets";
@@ -23,7 +22,6 @@ const navigation: { group: string; items: { path: string; label: string; icon: I
     { path: "pets", label: "จัดการสัตว์เลี้ยง", icon: "paw" },
     { path: "adoptions", label: "คำขอรับเลี้ยง", icon: "heart" },
     { path: "users", label: "ผู้ใช้งาน", icon: "users" },
-    { path: "announcements", label: "ประชาสัมพันธ์", icon: "megaphone" },
   ] },
 ];
 const allItems = navigation.flatMap((section) => section.items);
@@ -146,7 +144,6 @@ function AdminLayout() {
           <Route path="adoptions" element={<AdoptionList />} />
           <Route path="adoptions/:id" element={<CaseDetail />} />
           <Route path="users" element={<Users />} />
-          <Route path="announcements" element={<Announcements />} />
           <Route path="*" element={<section className="ad-card"><h1 className="ad-sr">ไม่พบหน้า</h1><p>ไม่พบหน้าผู้ดูแลนี้</p><Link className="ad-btn-link" to="/admin">กลับหน้าภาพรวม</Link></section>} />
         </Routes>
       </main>

@@ -15,7 +15,6 @@ const ADMIN_PERMISSIONS = [
   "adoptions.follow_up",
   "adoptions.resolve",
   "users.read",
-  "announcements.manage",
 ] as const;
 export type Permission = (typeof ADMIN_PERMISSIONS)[number];
 

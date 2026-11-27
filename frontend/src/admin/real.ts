@@ -1,7 +1,7 @@
 // Real Admin Mode: โหลด / เปลี่ยนข้อมูลผ่าน Backend แล้วเขียนลง store เดิม
 // ยืนยันสิทธิ์ด้วย GET /admin/me ก่อนโหลดข้อมูลอื่นทุกครั้ง · ไม่เคยใช้ role ที่เก็บในเบราว์เซอร์
 import { ApiError } from "../api/client";
-import { adminApi, caseKey, caseNumber, toAnnouncement, toCase, toEvent, toPet, toUser } from "./api";
+import { adminApi, caseKey, caseNumber, toCase, toEvent, toPet, toUser } from "./api";
 import { usePreview, type AdminStatus } from "./store";
 import { toast } from "../stores/useToastStore";
 import { notify } from "./ui";
@@ -9,7 +9,7 @@ import { notify } from "./ui";
 const fail = (message: string) => toast(message, "error");
 import type { CaseAction } from "./workflow";
 
-const empty = { users: [], pets: [], cases: [], announcements: [], me: undefined };
+const empty = { users: [], pets: [], cases: [], me: undefined };
 
 function statusOf(error: unknown): { status: AdminStatus; error: string } {
   if (error instanceof ApiError && error.status === 401) return { status: "unauthorized", error: error.message };
@@ -22,8 +22,8 @@ export async function loadAdmin({ silent = false } = {}) {
   if (!silent) usePreview.setState({ ...empty, status: "checking", error: undefined });
   try {
     const me = await adminApi.me();
-    const [pets, cases, users, announcements] = await Promise.all([
-      adminApi.pets(), adminApi.cases(), adminApi.users(), adminApi.announcements(),
+    const [pets, cases, users] = await Promise.all([
+      adminApi.pets(), adminApi.cases(), adminApi.users(),
     ]);
     const state = usePreview.getState();
     // เก็บไทม์ไลน์ที่โหลดไว้แล้ว (โหลดทีละเคสตอนเปิดหน้ารายละเอียด)
@@ -33,7 +33,6 @@ export async function loadAdmin({ silent = false } = {}) {
       pets: pets.map(toPet),
       cases: cases.map((c) => toCase(c, timelines.get(caseKey(c.id)) ?? [])),
       users: users.map(toUser),
-      announcements: announcements.map(toAnnouncement),
       preferences: { ...state.preferences, name: me.name },
     });
   } catch (error) {

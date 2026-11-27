@@ -34,7 +34,6 @@ await step("dataset: 10 pets with the expected statuses (no legacy mock data)", 
   assert.equal(pets.length, 10);
   const status = Object.fromEntries(pets.map((p) => [p.name, p.status]));
   assert.deepEqual(status, { ส้มโอ: "AVAILABLE", ข้าวตัง: "PENDING", โมจิ: "PENDING", บราวนี่: "PENDING", ปุยฝ้าย: "PENDING", ลัคกี้: "ADOPTED", เจ้าด่าง: "PENDING", น้ำตาล: "PENDING", ถุงทอง: "AVAILABLE", มะลิ: "AVAILABLE" });
-  assert.equal((await get("/announcements")).length, 3);
 });
 
 await step("applicant นิว: confirms the matched handover of ปุยฝ้าย → adoption completed", async () => {

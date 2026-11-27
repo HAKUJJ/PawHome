@@ -6,8 +6,6 @@
 
 import { createBrowserRouter } from "react-router";
 import RequireAuth from "./components/RequireAuth";
-import { homePromos } from "./data/promos";
-import PromoPage from "./pages/PromoPage";
 import RootLayout from "./layouts/RootLayout";
 import AllPetsPage from "./pages/AllPetsPage";
 import FavoritesPage from "./pages/FavoritesPage";
@@ -33,8 +31,6 @@ export const router = createBrowserRouter([
       { path: "guide", element: <GuidePage /> }, //          /guide       ความรู้เบื้องต้น
       { path: "login", element: <LoginPage /> }, //          /login       เข้าสู่ระบบ
       { path: "register", element: <RegisterPage /> }, //    /register    สมัครสมาชิก
-      // ข่าวสาร / ร่วมช่วยเหลือ / ผู้สนับสนุน — 1 รายการใน data/promos.ts = 1 หน้า
-      ...homePromos.map((promo) => ({ path: promo.path.slice(1), element: <PromoPage promo={promo} /> })),
 
       // ---- ต้องล็อกอินก่อน ----
       {

@@ -34,7 +34,7 @@ src/
 ├─ server.ts           listen
 ├─ config/             env (ตรวจด้วย Zod), prisma, supabase (service role + anon client)
 ├─ routes/index.ts     route สาธารณะ + ผู้ใช้
-├─ routes/admin.ts     /api/admin/* (ภาพรวม · สัตว์ · คำขอ · ผู้ใช้ (อ่านอย่างเดียว) · ประกาศ)
+├─ routes/admin.ts     /api/admin/* (ภาพรวม · สัตว์ · คำขอ · ผู้ใช้ (อ่านอย่างเดียว))
 ├─ middleware/         auth (ตรวจ Supabase token) · admin (RBAC จาก admin_memberships) · error (ApiError → { message }) · upload (multer)
 ├─ controllers/        แปลง HTTP ↔ service · parse input ด้วย validators
 ├─ services/           กฎธุรกิจ + ตรวจสิทธิ์เจ้าของ + transaction · adoption-workflow.ts (กฎขั้นตอนแบบฟังก์ชันล้วน) · admin*.service.ts · notifications.service.ts (แจ้งเตือนตามเหตุการณ์) · follow-up.service.ts (เกณฑ์ชั่วโมงของคิวติดตาม)

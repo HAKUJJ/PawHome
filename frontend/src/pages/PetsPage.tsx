@@ -1,5 +1,4 @@
 import { Link } from "react-router";
-import AdStrip from "../components/AdStrip";
 import PetList from "../components/PetList";
 
 // หน้าแรก "หาบ้านให้น้อง" — เน้นน้องที่ต้องการบ้านด่วน
@@ -24,9 +23,6 @@ export default function PetsPage() {
       </section>
 
       <section className="mx-auto max-w-6xl px-4 py-8 flex flex-col gap-6">
-        {/* โฆษณาแบบแถบเล็ก อยู่บนรายการน้อง */}
-        <AdStrip />
-
         {/* หน้าแรกไม่มีตัวกรอง แสดงน้องด่วนทุกตัว — อยากกรองให้ไปหน้า "น้องทั้งหมด" */}
         <PetList title="น้องที่ต้องการบ้านด่วน" urgentOnly />
 

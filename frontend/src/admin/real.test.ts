@@ -8,7 +8,7 @@ vi.mock("../api/client", async () => {
 });
 
 const { ApiError } = await import("../api/client");
-const { caseNumber, fromAnnouncement, toAnnouncement, toCase, toPet } = await import("./api");
+const { caseNumber, toCase, toPet } = await import("./api");
 const { loadAdmin, mutateAdmin, realCaseAction } = await import("./real");
 const { usePreview } = await import("./store");
 
@@ -26,7 +26,6 @@ const apiCase = {
   confirmations: { owner: false, applicant: false },
 };
 const users = [{ id: "u-owner", name: "เจ้าของ", role: "USER", joinedAt: "2026-01-01T00:00:00.000Z" }];
-const announcement = { id: 3, title: "ตลาดนัด", category: "กิจกรรม", description: "", eventDate: null, eventTime: "", location: "", contact: "", cta: "ดู", destination: "/pets", imageUrl: "", status: "PUBLISHED", displayOrder: 1, isDemo: false };
 
 function backend(overrides: Record<string, () => unknown> = {}) {
   request.mockImplementation(async (path: string) => {
@@ -36,14 +35,13 @@ function backend(overrides: Record<string, () => unknown> = {}) {
     if (path.startsWith("/admin/adoptions") && path.includes("/timeline")) return [{ at: "2026-11-21T03:00:00.000Z", kind: "STAGE", actorRole: "OWNER", actorName: "เจ้าของ", label: "เจ้าของอนุมัติ", note: "" }];
     if (path.startsWith("/admin/adoptions")) return { items: [apiCase], total: 1, page: 1, limit: 200 };
     if (path.startsWith("/admin/users")) return { items: users, total: 1, page: 1, limit: 200 };
-    if (path === "/admin/announcements") return [announcement];
     return {};
   });
 }
 
 beforeEach(() => {
   request.mockReset();
-  usePreview.setState({ status: "checking", pets: [], cases: [], users: [], announcements: [] });
+  usePreview.setState({ status: "checking", pets: [], cases: [], users: [] });
 });
 
 describe("mapping Backend → screen model", () => {
@@ -59,11 +57,6 @@ describe("mapping Backend → screen model", () => {
     expect(() => caseNumber("12")).toThrow();
   });
 
-  it("announcements round-trip without changing fields", () => {
-    const screen = toAnnouncement(announcement as never);
-    expect(screen).toMatchObject({ id: "3", published: true, order: 1, date: "" });
-    expect(fromAnnouncement(screen)).toMatchObject({ status: "PUBLISHED", displayOrder: 1, eventDate: null, destination: "/pets" });
-  });
 
 });
 

@@ -204,43 +204,6 @@ describe("users overview", () => {
   });
 });
 
-describe("announcements", () => {
-  let id = 0;
-
-  it("validates destination and image ownership", async () => {
-    const bad = await api.post("/api/admin/announcements").set(auth(admin.token)).send({ title: "ลิงก์นอก", destination: "https://evil.example" });
-    expect(bad.status).toBe(400);
-    const js = await api.post("/api/admin/announcements").set(auth(admin.token)).send({ title: "สคริปต์", destination: "javascript:alert(1)" });
-    expect(js.status).toBe(400);
-    const foreignImage = await api.post("/api/admin/announcements").set(auth(admin.token))
-      .send({ title: "รูปคนอื่น", imageUrl: `https://storage.test/pet-images/${alice.id}/x.jpg` });
-    expect(foreignImage.status).toBe(400);
-    const ownImage = `https://storage.test/pet-images/${admin.id}/0b8f1c1e-1111-4222-8333-944455556666.jpg`;
-    const ok = await api.post("/api/admin/announcements").set(auth(admin.token))
-      .send({ title: "ตลาดนัดรับเลี้ยง", category: "กิจกรรม", destination: "/pets", imageUrl: ownImage, isDemo: true });
-    expect(ok.status).toBe(201);
-    expect(ok.body).toMatchObject({ status: "DRAFT", isDemo: true, publishedAt: null });
-    id = ok.body.id;
-  });
-
-  it("draft is not public; publish → public; published cannot be deleted", async () => {
-    const publicIds = async () => (await api.get("/api/announcements")).body.map((a: { id: number }) => a.id);
-    expect(await publicIds()).not.toContain(id);
-    const pub = await api.patch(`/api/admin/announcements/${id}`).set(auth(admin.token)).send({ status: "PUBLISHED", displayOrder: 2 });
-    expect(pub.body).toMatchObject({ status: "PUBLISHED", displayOrder: 2, category: "กิจกรรม" }); // ฟิลด์ที่ไม่ได้ส่งไม่ถูกเขียนทับ
-    expect(pub.body.publishedAt).toBeTruthy();
-    expect(await publicIds()).toContain(id);
-    expect((await api.delete(`/api/admin/announcements/${id}`).set(auth(admin.token))).status).toBe(409);
-    expect((await api.patch(`/api/admin/announcements/${id}`).set(auth(admin.token)).send({})).status).toBe(400);
-    await api.patch(`/api/admin/announcements/${id}`).set(auth(admin.token)).send({ status: "DRAFT" });
-    expect((await api.delete(`/api/admin/announcements/${id}`).set(auth(admin.token))).status).toBe(204);
-  });
-
-  it("USER cannot manage announcements", async () => {
-    expect((await api.post("/api/admin/announcements").set(auth(alice.token)).send({ title: "ปลอม" })).status).toBe(403);
-  });
-});
-
 describe("dashboard + removed endpoints", () => {
   it("dashboard counts come from the database", async () => {
     const res = await api.get("/api/admin/dashboard").set(auth(admin.token));
@@ -251,10 +214,12 @@ describe("dashboard + removed endpoints", () => {
     expect(res.body).not.toHaveProperty("recentAudit");
   });
 
-  it("reports, audit logs, escalate and cron endpoints were removed", async () => {
+  it("reports, audit logs, escalate, cron and announcement endpoints were removed", async () => {
     expect((await api.get("/api/admin/reports").set(auth(admin.token))).status).toBe(404);
     expect((await api.get("/api/admin/audit-logs").set(auth(admin.token))).status).toBe(404);
     expect((await api.post("/api/admin/adoptions/1/escalate").set(auth(admin.token)).send({})).status).toBe(404);
     expect((await api.get("/api/internal/cron/follow-ups")).status).toBe(404);
+    expect((await api.get("/api/admin/announcements").set(auth(admin.token))).status).toBe(404);
+    expect((await api.get("/api/announcements")).status).toBe(404);
   });
 });

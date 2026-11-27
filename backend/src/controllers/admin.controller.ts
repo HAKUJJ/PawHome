@@ -5,16 +5,14 @@ import { currentUser } from "../middleware/auth.js";
 import { ApiError } from "../middleware/error.js";
 import { adminAdoptionsService } from "../services/admin-adoptions.service.js";
 import { adminService } from "../services/admin.service.js";
-import { announcementsService } from "../services/announcements.service.js";
 import {
-  announcementCreateSchema, announcementUpdateSchema, caseFiltersSchema, closeSchema, followUpSchema, moderationSchema,
+  caseFiltersSchema, closeSchema, followUpSchema, moderationSchema,
   petFiltersAdminSchema, petVisibilitySchema, reviewHandoverSchema, userFiltersSchema,
 } from "../validators/admin.validator.js";
 import { parseId } from "../validators/common.validator.js";
 
 const petId = (v: unknown) => parseId(v, "ไม่พบโพสต์");
 const caseId = (v: unknown) => parseId(v, "ไม่พบคำขอ");
-const announcementId = (v: unknown) => parseId(v, "ไม่พบประกาศ");
 function userId(v: unknown): string {
   const parsed = z.string().uuid().safeParse(v);
   if (!parsed.success) throw new ApiError(404, "ไม่พบผู้ใช้");
@@ -79,20 +77,4 @@ export const adminController = {
   getUser: (async (req, res) => {
     res.json(await adminService.getUser(userId(req.params.id)));
   }) satisfies Handler,
-  // ---- ประกาศ ----
-  listAnnouncements: (async (_req, res) => {
-    res.json(await announcementsService.listAll());
-  }) satisfies Handler,
-  createAnnouncement: (async (req, res) => {
-    res.status(201).json(await announcementsService.create(currentAdmin(res), announcementCreateSchema.parse(req.body)));
-  }) satisfies Handler,
-  updateAnnouncement: (async (req, res) => {
-    const id = announcementId(req.params.id);
-    res.json(await announcementsService.update(currentAdmin(res), id, announcementUpdateSchema.parse(req.body)));
-  }) satisfies Handler,
-  deleteAnnouncement: (async (req, res) => {
-    await announcementsService.remove(announcementId(req.params.id));
-    res.status(204).end();
-  }) satisfies Handler,
-
 };

@@ -5,7 +5,7 @@
 // =========================================================
 import { request } from "../api/client";
 import type { Sex, Species } from "../types/pet";
-import type { Announcement, PreviewPet, PreviewUser, Visibility } from "./store";
+import type { PreviewPet, PreviewUser, Visibility } from "./store";
 import type { AdoptionCase, CaseEvent, Handover, Stage } from "./workflow";
 
 // ---------- รูปแบบจาก Backend (ตรงกับ backend/src/types/admin.ts) ----------
@@ -29,10 +29,6 @@ export interface ApiCase {
   reports: { owner: ApiReport | null; applicant: ApiReport | null }; confirmations: { owner: boolean; applicant: boolean };
 }
 export interface ApiUser { id: string; name: string; role: "USER" | "ADMIN" | "SUPER_ADMIN"; joinedAt: string }
-export interface ApiAnnouncement {
-  id: number; title: string; category: string; description: string; eventDate: string | null; eventTime: string; location: string;
-  contact: string; cta: string; destination: string; imageUrl: string; status: "DRAFT" | "PUBLISHED"; displayOrder: number; isDemo: boolean;
-}
 interface ApiEvent { at: string; kind: string; actorRole: string; actorName: string; label: string; note: string }
 
 // ---------- แปลงเป็นรูปแบบของหน้าจอ ----------
@@ -73,10 +69,6 @@ export const toUser = (u: ApiUser): PreviewUser => ({
   id: u.id, name: u.name, role: u.role === "USER" ? "member" : "admin", joinedAt: ms(u.joinedAt), province: "–",
 });
 
-export const toAnnouncement = (a: ApiAnnouncement): Announcement => ({
-  id: String(a.id), title: a.title, category: a.category, description: a.description, date: a.eventDate ?? "", time: a.eventTime,
-  location: a.location, contact: a.contact, cta: a.cta, destination: a.destination, published: a.status === "PUBLISHED", order: a.displayOrder,
-});
 
 
 const actor = (role: string): CaseEvent["actor"] => (role === "OWNER" ? "owner" : role === "APPLICANT" ? "applicant" : "admin");
@@ -101,7 +93,6 @@ export const adminApi = {
   pets: () => all<ApiPet>("/admin/pets"),
   cases: () => all<ApiCase>("/admin/adoptions"),
   users: () => all<ApiUser>("/admin/users"),
-  announcements: () => request<ApiAnnouncement[]>("/admin/announcements"),
   timeline: (id: number) => request<ApiEvent[]>(`/admin/adoptions/${id}/timeline`),
 
   moderatePet: (id: number, decision: "APPROVE" | "REQUEST_CHANGES", reason = "") => request(`/admin/pets/${id}/moderation`, json("POST", { decision, reason })),
@@ -113,14 +104,5 @@ export const adminApi = {
   closeCase: (id: number, note = "") => request(`/admin/adoptions/${id}/close`, json("POST", { note })),
 
 
-  createAnnouncement: (a: Announcement) => request(`/admin/announcements`, json("POST", fromAnnouncement(a))),
-  updateAnnouncement: (id: string, patch: Partial<ReturnType<typeof fromAnnouncement>>) => request(`/admin/announcements/${id}`, json("PATCH", patch)),
-  deleteAnnouncement: (id: string) => request(`/admin/announcements/${id}`, { method: "DELETE" }),
 };
 
-export function fromAnnouncement(a: Announcement) {
-  return {
-    title: a.title, category: a.category, description: a.description, eventDate: a.date || null, eventTime: a.time, location: a.location,
-    contact: a.contact, cta: a.cta, destination: a.destination || "/", status: a.published ? ("PUBLISHED" as const) : ("DRAFT" as const), displayOrder: a.order,
-  };
-}
