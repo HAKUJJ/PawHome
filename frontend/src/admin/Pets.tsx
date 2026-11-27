@@ -3,9 +3,10 @@ import { useSearchParams } from "react-router";
 import { useConfirmation } from "../components/ConfirmDialog";
 import { Dialog } from "../components/Dialog";
 import { formatAge, sexLabel, speciesLabel, type Species } from "../types/pet";
+import { adminApi } from "./api";
+import { mutateAdmin } from "./real";
 import { formatDate, petStatus, usePreview, userName, type PreviewPet, type Visibility } from "./store";
-import { Badge, DataTable, Empty, Field, matches, notify, PageHeader, SearchInput, Select, Thumb, usePaged, type Tone, Card } from "./ui";
-import { isTerminal } from "./workflow";
+import { Badge, DataTable, Empty, Field, matches, PageHeader, SearchInput, Select, Thumb, usePaged, type Tone, Card } from "./ui";
 
 const statusFilter = [["all", "ทุกสถานะ"], ["review", "รอตรวจสอบ"], ["changes", "ส่งกลับให้แก้ไข"], ["visible", "แสดงอยู่"], ["hidden", "ซ่อนอยู่"]] as const;
 const sorts = [["new", "ใหม่ล่าสุด"], ["old", "เก่าสุด"], ["name", "ชื่อ ก–ฮ"], ["age", "อายุน้อย → มาก"]] as const;
@@ -37,25 +38,11 @@ export function Pets() {
   const filter = <T,>(set: (value: T) => void) => (value: T) => { set(value); reset(); };
 
   const setVisibility = (pet: PreviewPet, visibility: Visibility, action: string, note?: string) => {
-    data.change(action, pet.name, "สัตว์เลี้ยง", (state) => ({
-      pets: state.pets.map((entry) => (entry.id === pet.id ? { ...entry, visibility, reviewNote: note } : entry)),
-    }), note);
-    notify(`${action}แล้ว (ข้อมูลจำลอง)`);
-  };
-  const remove = (pet: PreviewPet) => {
-    const open = data.cases.some((item) => item.petId === pet.id && !isTerminal(item.stage));
-    confirm({
-      title: `ลบโพสต์ ${pet.name}`,
-      description: open ? "น้องตัวนี้มีคำขอรับเลี้ยงที่ยังเปิดอยู่ คำขอเหล่านั้นจะถูกลบไปด้วย (เฉพาะข้อมูลจำลอง)" : "ลบโพสต์ออกจากข้อมูลจำลอง (ไม่มีผลกับเว็บไซต์จริง)",
-      label: "ลบโพสต์", danger: true,
-      action: () => {
-        data.change("ลบโพสต์", pet.name, "สัตว์เลี้ยง", (state) => ({
-          pets: state.pets.filter((entry) => entry.id !== pet.id), cases: state.cases.filter((item) => item.petId !== pet.id),
-        }));
-        setSelectedId(null);
-        notify("ลบโพสต์จำลองแล้ว");
-      },
-    });
+    // อนุมัติโพสต์ที่รอตรวจ/ส่งกลับแก้ = ผลตรวจ · ซ่อน/แสดงโพสต์ที่ผ่านแล้ว = เปลี่ยน visibility
+    const run = visibility === "changes" ? () => adminApi.moderatePet(pet.id, "REQUEST_CHANGES", note)
+      : visibility === "visible" && pet.visibility !== "hidden" ? () => adminApi.moderatePet(pet.id, "APPROVE")
+      : () => adminApi.setPetVisibility(pet.id, visibility === "hidden" ? "HIDDEN" : "VISIBLE", note);
+    void mutateAdmin(run, `${action}แล้ว`);
   };
 
   return <>
@@ -77,7 +64,7 @@ export function Pets() {
             <td><span className="ad-name-cell" title={pet.name}>{pet.name}</span></td>
             <td>{speciesLabel[pet.species]}</td><td>{formatAge(pet.ageMonths)}</td><td>{pet.province}</td><td>{userName(data, pet.ownerId)}</td>
             <td><Badge tone={statusTone[label]}>{label}</Badge></td><td>{formatDate(pet.createdAt)}</td>
-            <td><button type="button" className="ad-btn" aria-label={`ดูโพสต์ ${pet.name}`} onClick={() => setSelectedId(pet.id)}>ดู / จัดการ</button></td>
+            <td><button type="button" className="ad-btn" aria-label={`ดูโพสต์ ${pet.name}`} onClick={() => setSelectedId(pet.id)}>ดูรายละเอียด</button></td>
           </tr>;
         })}
       </DataTable> : <Empty title="ไม่พบโพสต์ที่ตรงกับตัวกรอง" />}
@@ -98,7 +85,7 @@ export function Pets() {
         </dl>
         <p className={selected.description ? "ad-pre" : "ad-muted"}>{selected.description || "ผู้โพสต์ยังไม่ได้เขียนรายละเอียด"}</p>
         {selected.visibility === "changes" && selected.reviewNote && <div className="ad-callout ad-callout-warning"><b>สิ่งที่ขอให้แก้ไข</b>{selected.reviewNote}</div>}
-        {selected.visibility !== "visible" && <>
+        {selected.visibility !== "visible" && selected.visibility !== "hidden" && <>
           <h3>ผลการตรวจโพสต์</h3>
           <div className="ad-row">
             <button type="button" className="ad-btn ad-btn-success" onClick={() => setVisibility(selected, "visible", "อนุมัติโพสต์")}>✓ อนุมัติ</button>
@@ -107,8 +94,8 @@ export function Pets() {
         </>}
         <h3>จัดการโพสต์</h3>
         <div className="ad-row">
-          {selected.visibility === "visible" && <button type="button" className="ad-btn" onClick={() => confirm({ title: `ซ่อนโพสต์ ${selected.name}`, description: "โพสต์จะไม่แสดงต่อผู้เข้าชมจนกว่าจะอนุมัติอีกครั้ง (ตัวอย่าง)", label: "ซ่อนโพสต์", action: () => setVisibility(selected, "hidden", "ซ่อนโพสต์") })}>ซ่อนโพสต์</button>}
-          <button type="button" className="ad-btn ad-btn-danger" onClick={() => remove(selected)}>ลบโพสต์</button>
+          {selected.visibility === "hidden" && <button type="button" className="ad-btn ad-btn-success" onClick={() => setVisibility(selected, "visible", "แสดงโพสต์")}>แสดงโพสต์อีกครั้ง</button>}
+          {selected.visibility === "visible" && <button type="button" className="ad-btn" onClick={() => confirm({ title: `ซ่อนโพสต์ ${selected.name}`, description: "โพสต์จะไม่แสดงต่อผู้เข้าชมจนกว่าผู้ดูแลจะแสดงอีกครั้ง", label: "ซ่อนโพสต์", action: () => setVisibility(selected, "hidden", "ซ่อนโพสต์") })}>ซ่อนโพสต์</button>}
         </div>
       </div>
     </Dialog>}
@@ -124,7 +111,7 @@ function ReasonDialog({ pet, onClose, onSave }: { pet: PreviewPet; onClose: () =
   const [note, setNote] = useState("");
   return <Dialog title={`ส่งกลับไปแก้ไข · ${pet.name.slice(0, 40)}`} onClose={onClose}>
     <form className="ad-stack" onSubmit={(event) => { event.preventDefault(); if (note.trim()) onSave(note.trim()); }}>
-      <p className="ad-muted">เจ้าของจะเห็นสิ่งที่ต้องแก้ แล้วส่งกลับมาให้ตรวจอีกครั้ง (ข้อมูลจำลอง ไม่ส่งข้อความจริง)</p>
+      <p className="ad-muted">เจ้าของจะเห็นสิ่งที่ต้องแก้ แล้วส่งกลับมาให้ตรวจอีกครั้ง{" · โพสต์จะถูกซ่อนจนกว่าจะผ่านการตรวจ"}</p>
       <div className="ad-chips" role="group" aria-label="เหตุผลสำเร็จรูป">
         {reasons.map((text) => <button key={text} type="button" className="ad-chip" onClick={() => setNote((current) => (current ? `${current}
 ${text}` : text))}>+ {text}</button>)}

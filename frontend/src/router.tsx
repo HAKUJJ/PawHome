@@ -21,11 +21,8 @@ import PetsPage from "./pages/PetsPage";
 import RegisterPage from "./pages/RegisterPage";
 
 export const router = createBrowserRouter([
-  // Admin Preview (ข้อมูลจำลอง): มีเฉพาะ `vite dev` ที่ตั้ง VITE_ADMIN_PREVIEW=true
-  // production build ตัดทั้งก้อนทิ้ง (import.meta.env.DEV เป็น false ตอน build) — ไม่ใช่ระบบสิทธิ์ผู้ดูแลจริง
-  ...(import.meta.env.DEV && import.meta.env.VITE_ADMIN_PREVIEW === "true"
-    ? [{ path: "/admin/*", lazy: () => import("./admin/AdminPreview"), hydrateFallbackElement: <p role="status" className="p-6">กำลังเปิดหน้าตัวอย่าง…</p> }]
-    : []),
+  // หน้าผู้ดูแล (lazy เป็นไฟล์แยก) · ข้อมูลจริงจาก /api/admin/* · Backend ตรวจสิทธิ์ผู้ดูแลทุก request
+  { path: "/admin/*", lazy: () => import("./admin/AdminPreview"), hydrateFallbackElement: <p role="status" className="p-6">กำลังเปิดหน้าผู้ดูแล…</p> },
   {
     path: "/",
     element: <RootLayout />,

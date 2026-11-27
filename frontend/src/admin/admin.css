@@ -27,7 +27,7 @@
 .ad-nav a svg { flex-shrink: 0; width: 1.25rem; height: 1.25rem; color: var(--color-navy); }
 .ad-nav a:hover { background: var(--color-navy-soft); }
 .ad-nav a[aria-current="page"] { background: var(--color-navy); color: #fff; box-shadow: var(--shadow); }
-.ad-nav a[aria-current="page"] svg { color: #fff; fill: currentColor; }
+.ad-nav a[aria-current="page"] svg { color: #fff; }
 .ad-nav-count { margin-left: auto; min-width: 1.6rem; padding: 0 .4rem; border-radius: 99px; background: var(--color-sand); color: var(--color-ink); font-size: .75rem; font-weight: 700; text-align: center; line-height: 1.5rem; }
 .ad-nav a[aria-current="page"] .ad-nav-count { background: #ffffff33; color: #fff; }
 .ad-nav .ad-back { margin-top: auto; border-top: 1px solid var(--color-line); border-radius: 0; padding-top: .9rem; color: var(--color-muted); font-size: .9rem; }
@@ -43,7 +43,6 @@
 .ad-search:hover { border-color: var(--color-navy); }
 .ad-icon-btn { position: relative; display: grid; place-items: center; width: 2.75rem; height: 2.75rem; border-radius: .8rem; color: var(--color-ink); }
 .ad-icon-btn:hover { background: var(--color-navy-soft); }
-.ad-dot { position: absolute; top: .55rem; right: .6rem; width: .6rem; height: .6rem; border-radius: 50%; background: var(--color-danger); box-shadow: 0 0 0 2px #fff; }
 .ad-profile { display: flex; align-items: center; gap: .55rem; font-size: .9rem; font-weight: 600; }
 .ad-avatar { display: grid; place-items: center; width: 2.3rem; height: 2.3rem; border-radius: 50%; background: var(--color-navy); color: #fff; font-weight: 700; flex-shrink: 0; }
 .ad-menu-btn, .ad-mobile-brand { display: none !important; }
@@ -52,6 +51,11 @@
 .ad-main { width: min(100%, 82rem); margin-inline: auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.25rem; padding: 1.5rem clamp(.75rem, 2.5vw, 2rem) 3rem; outline: none; }
 .ad-env { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; font-size: .85rem; color: var(--color-muted); }
 .ad-env strong { padding: .2rem .7rem; border-radius: 99px; background: var(--warn-bg); color: var(--warn); font-weight: 650; }
+.ad-env-real strong { background: var(--color-navy-soft); color: var(--color-navy); }
+/* Real Mode: หน้าตรวจสิทธิ์ก่อนเข้า (ยังไม่แสดงข้อมูลใด ๆ) */
+.ad-gate { display: grid; place-items: center; min-height: 100vh; padding: 1rem; }
+.ad-gate > main { width: min(100%, 28rem); text-align: center; justify-items: center; }
+.ad-gate h1 { font: 700 1.35rem var(--font-display); }
 .ad-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: .9rem; }
 .ad-head h1 { font-size: clamp(1.7rem, 3vw, 2.3rem); font-weight: 700; }
 .ad-head p { margin-top: .2rem; color: var(--color-muted); }
@@ -174,9 +178,6 @@ a.ad-stat:hover { border-color: var(--color-navy); }
 .ad-callout b { display: block; color: var(--color-navy-dark); }
 .ad-callout-danger { background: var(--bad-bg); }
 .ad-callout-danger b { color: var(--bad); }
-.ad-threshold { display: grid; grid-template-columns: 4.5rem minmax(0, 1fr) auto; align-items: center; gap: .75rem; padding: .7rem 0; }
-.ad-threshold + .ad-threshold { border-top: 1px solid var(--color-line); }
-.ad-threshold strong { font: 700 1.25rem var(--font-display); color: var(--color-navy); }
 
 /* ---------- Charts ---------- */
 .ad-columns { display: flex; align-items: flex-end; gap: .5rem; height: 11rem; }

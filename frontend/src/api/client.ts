@@ -12,13 +12,9 @@ import type { AuthResponse } from "../types/user";
 
 export const API_URL = (import.meta.env.VITE_API_URL ?? "").trim().replace(/\/+$/, "");
 
-// ใช้ข้อมูลจำลองเฉพาะเมื่อสั่ง VITE_USE_MOCK=true ตรง ๆ เท่านั้น
-// (ไม่ fallback เป็นข้อมูลจำลองเงียบ ๆ ตอนลืมตั้ง VITE_API_URL — ผู้ใช้จะเห็นข้อมูลปลอมโดยไม่รู้ตัว)
-export const USE_MOCK = import.meta.env.VITE_USE_MOCK === "true";
-
-// ไม่ใช้ข้อมูลจำลอง แต่ไม่ได้ตั้ง VITE_API_URL → ทุก request โยน error นี้ และ main.tsx แสดงหน้าแจ้งเตือน
+// เว็บใช้ข้อมูลจริงจาก Backend เท่านั้น (ไม่มีโหมดข้อมูลจำลอง) · ไม่ได้ตั้ง VITE_API_URL → main.tsx แสดงหน้าแจ้งเตือน ไม่แอบใช้ข้อมูลปลอม
 export const CONFIG_ERROR: string | null =
-  !USE_MOCK && !API_URL ? "ยังไม่ได้ตั้งค่า VITE_API_URL (ลิงก์ Backend รวม /api) จึงเชื่อมต่อเซิร์ฟเวอร์ไม่ได้" : null;
+  !API_URL ? "ยังไม่ได้ตั้งค่า VITE_API_URL (ลิงก์ Backend รวม /api) จึงเชื่อมต่อเซิร์ฟเวอร์ไม่ได้" : null;
 
 // ขอ token ใหม่ก่อนหมดอายุจริง 60 วินาที กันหมดระหว่างทาง
 const REFRESH_EARLY_SECONDS = 60;

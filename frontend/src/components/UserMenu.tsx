@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Link, useLocation } from "react-router";
 import { useLogout } from "../hooks/useAuth";
+import { useNotifications } from "../hooks/useSite";
 import { initialOf, shortName, type User } from "../types/user";
 
 // ไอคอนเส้นขนาด 20 (ใช้ currentColor)
@@ -14,6 +15,7 @@ const icons = {
   paw: icon(<><circle cx="5" cy="8" r="1.5" /><circle cx="8" cy="4.8" r="1.5" /><circle cx="12" cy="4.8" r="1.5" /><circle cx="15" cy="8" r="1.5" /><path d="M10 9.5c-2.5 0-4.5 3.2-4.5 5.2 0 1.4 1 2.1 2.2 2.1.9 0 1.5-.5 2.3-.5s1.4.5 2.3.5c1.2 0 2.2-.7 2.2-2.1 0-2-2-5.2-4.5-5.2z" /></>),
   heart: icon(<path d="M10 16.5s-6-3.7-7.4-7.4C1.6 6.6 3.2 3.6 6 3.6c1.6 0 3 .9 4 2.4 1-1.5 2.4-2.4 4-2.4 2.8 0 4.4 3 3.4 5.5C16 12.8 10 16.5 10 16.5z" />),
   clipboard: icon(<><rect x="4.5" y="3.5" width="11" height="14" rx="2" /><path d="M7.5 3.5V2.8c0-.4.3-.8.8-.8h3.4c.5 0 .8.4.8.8v.7M7.5 9h5M7.5 12.5h5" /></>),
+  bell: icon(<><path d="M5 14h10l-1.3-1.8V8.5a3.7 3.7 0 0 0-7.4 0v3.7L5 14z" /><path d="M8.5 16.5a1.6 1.6 0 0 0 3 0" /></>),
   logout: icon(<><path d="M8 17H5a1.5 1.5 0 0 1-1.5-1.5v-11A1.5 1.5 0 0 1 5 3h3" /><path d="M13 14l4-4-4-4M17 10H8" /></>),
 };
 const chevronRight = (
@@ -28,6 +30,7 @@ const items = [
   { to: "/me?tab=posts", label: "โพสต์ของฉัน", icon: icons.paw },
   { to: "/favorites", label: "รายการโปรด", icon: icons.heart },
   { to: "/me?tab=requests", label: "คำขอรับเลี้ยง", icon: icons.clipboard },
+  { to: "/me?tab=notifications", label: "การแจ้งเตือน", icon: icons.bell },
 ];
 
 // เมนูบัญชีบน Navbar: avatar + ชื่อสั้น → กดแล้วเปิดเมนู
@@ -38,6 +41,7 @@ export default function UserMenu({ user, onNavigate }: { user: User; onNavigate?
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const unread = useNotifications().data?.unread ?? 0;
   const focusOnOpen = useRef<"first" | "last" | null>(null);
   const menuId = useId();
   const logout = useLogout();
@@ -118,12 +122,15 @@ export default function UserMenu({ user, onNavigate }: { user: User; onNavigate?
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
-        aria-label={`เมนูบัญชี ${user.name}`}
+        aria-label={`เมนูบัญชี ${user.name}${unread ? ` · แจ้งเตือนยังไม่อ่าน ${unread} รายการ` : ""}`}
         className={`w-full md:w-auto min-h-11 flex items-center gap-2 rounded-full py-1 pl-1 pr-2 transition-colors hover:bg-navy-soft focus-visible:outline-2 focus-visible:outline-navy ${
           open ? "bg-navy-soft" : ""
         }`}
       >
-        <Avatar user={user} />
+        <span className="relative">
+          <Avatar user={user} />
+          {unread > 0 && <span aria-hidden="true" className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 rounded-full bg-danger text-white text-[10px] leading-4 text-center font-semibold">{unread > 9 ? "9+" : unread}</span>}
+        </span>
         <span className="font-semibold truncate max-w-40">{shortName(user.name)}</span>
         <svg viewBox="0 0 20 20" aria-hidden="true" className={`size-4 ml-auto md:ml-0 text-muted transition-transform ${open ? "rotate-180" : ""}`}>
           <path d="M5 7.5l5 5 5-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -161,6 +168,7 @@ export default function UserMenu({ user, onNavigate }: { user: User; onNavigate?
               >
                 <span className={current ? "text-navy" : "text-muted"}>{item.icon}</span>
                 {item.label}
+                {item.to.endsWith("notifications") && unread > 0 && <span className="ml-auto text-xs font-semibold rounded-full bg-danger text-white px-2 py-0.5">{unread}</span>}
                 {chevronRight}
               </Link>
             );

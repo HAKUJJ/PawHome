@@ -2,16 +2,16 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { speciesLabel, type Species } from "../types/pet";
 import { metrics } from "./Dashboard";
-import { previewNow, usePreview, type PreviewData } from "./store";
+import { usePreview, type PreviewData } from "./store";
 import { Card, Icon, PageHeader, Select, StatCard } from "./ui";
 import { followUp, HOUR, stageLabel, type Stage } from "./workflow";
 
 const ranges = [["30", "30 วันล่าสุด"], ["90", "90 วันล่าสุด"], ["365", "1 ปี"], ["all", "ทั้งหมด"]] as const;
 type Range = (typeof ranges)[number][0];
 
-// สรุปทั้งหมดจากข้อมูลจำลองชุดเดียว — แดชบอร์ดใช้ metrics() ตัวเดียวกัน ตัวเลขจึงไม่ขัดกัน
+// สรุปทั้งหมดจากข้อมูลชุดเดียวใน store — แดชบอร์ดใช้ metrics() ตัวเดียวกัน ตัวเลขจึงไม่ขัดกัน
 export function report(data: PreviewData, range: Range) {
-  const now = previewNow(data);
+  const now = Date.now();
   const from = range === "all" ? 0 : now - Number(range) * 24 * HOUR;
   const cases = data.cases.filter((item) => item.createdAt >= from);
   const count = <K extends string>(keys: K[]) => keys.map((key) => [key, 0] as [K, number]);
@@ -74,7 +74,7 @@ export function Reports() {
 
   return <>
     <PageHeader title="รายงาน" action={<button type="button" className="ad-btn ad-btn-primary" onClick={download}><Icon name="download" />ดาวน์โหลด CSV</button>}>
-      สรุปจากข้อมูลจำลองชุดเดียวกับหน้าภาพรวม
+      สรุปจากข้อมูลจริงชุดเดียวกับหน้าภาพรวม
     </PageHeader>
     <div className="ad-filters"><Select label="ช่วงเวลา" value={range} onChange={setRange} options={ranges} /></div>
     <div className="ad-stats">

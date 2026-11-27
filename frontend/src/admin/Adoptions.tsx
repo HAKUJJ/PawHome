@@ -1,10 +1,11 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { useConfirmation } from "../components/ConfirmDialog";
 import { Dialog } from "../components/Dialog";
 import { handoverStages } from "./Dashboard";
-import { formatDateTime, idleText, ownerOf, petOf, previewNow, usePreview, userName } from "./store";
-import { Badge, byUrgency, Card, CaseRow, Chips, Empty, Field, insight, matches, notify, PageHeader, priorityChip, SearchInput, Select, stageTone, Thumb, usePaged } from "./ui";
+import { loadTimeline, realCaseAction } from "./real";
+import { formatDateTime, idleText, ownerOf, petOf, usePreview, userName } from "./store";
+import { Badge, byUrgency, Card, CaseRow, Chips, Empty, Field, insight, matches, PageHeader, priorityChip, SearchInput, Select, stageTone, Thumb, usePaged } from "./ui";
 import {
   caseSteps, currentStep, followUp, handoverLabel, isTerminal, partyLabel, priorityLabel, reportsMatch, stageLabel,
   type AdoptionCase, type CaseAction, type Party, type Priority, type Stage,
@@ -22,7 +23,7 @@ type Quick = keyof typeof quick;
 
 export function AdoptionList() {
   const data = usePreview();
-  const now = previewNow(data);
+  const now = Date.now();
   const [params, setParams] = useSearchParams();
   const filter = (params.get("filter") ?? "all") as Quick;
   const stage = (params.get("stage") ?? "all") as Stage | "all";
@@ -40,7 +41,7 @@ export function AdoptionList() {
     return key === "all" || (key === "required" && open && policy.required) || (key === "overdue" && policy.overdue) ||
       (key === "flagged" && open && item.flagged) || (key === "disputed" && item.disputed) || (key === "handover" && open && handoverStages.includes(item.stage));
   };
-  const filtered = byUrgency(data, data.cases.filter((item) => {
+  const filtered = byUrgency(data.cases.filter((item) => {
     const pet = petOf(data, item.petId);
     return test(item, filter) && (stage === "all" || item.stage === stage) && (priority === "all" || followUp(item, now).priority === priority) &&
       matches(query, item.id, pet?.name, userName(data, item.applicantId), userName(data, ownerOf(data, item)));
@@ -93,20 +94,23 @@ export function CaseBadges({ item, now }: { item: AdoptionCase; now: number }) {
   </div>;
 }
 
-const tabs = [["overview", "ภาพรวม"], ["timeline", "ไทม์ไลน์"], ["notifications", "ตัวอย่างแจ้งเตือน"], ["notes", "บันทึกติดตาม"], ["handover", "รายงานส่งมอบ"]] as const;
-type Prompt = "contact" | "note" | "verify";
-const promptTitle: Record<Prompt, string> = { contact: "บันทึกการติดต่อ", note: "เพิ่มบันทึกติดตาม", verify: "ยืนยันผลตรวจสอบการส่งมอบ" };
+const tabs = [["overview", "ภาพรวม"], ["timeline", "ไทม์ไลน์"], ["notes", "บันทึกติดตาม"], ["handover", "รายงานส่งมอบ"]] as const;
+type Prompt = "contact" | "note" | "verify" | "legacyComplete" | "legacyReopen";
+const promptTitle: Record<Prompt, string> = {
+  contact: "บันทึกการติดต่อ", note: "เพิ่มบันทึกติดตาม", verify: "ยืนยันผลตรวจสอบการส่งมอบ",
+  legacyComplete: "ยืนยันว่าส่งมอบแล้ว (คำขอจากระบบเดิม)", legacyReopen: "ยังไม่ได้ส่งมอบ ให้ดำเนินการต่อ",
+};
 
 export function CaseDetail() {
   const { id } = useParams();
   const item = usePreview((state) => state.cases.find((entry) => entry.id === id));
-  if (!item) return <><PageHeader title="ไม่พบเคส">ไม่มีเคส {id} ในข้อมูลจำลอง</PageHeader><Link className="ad-btn-link" to="/admin/adoptions">← กลับไปรายการคำขอ</Link></>;
+  if (!item) return <><PageHeader title="ไม่พบเคส">ไม่มีเคส {id}</PageHeader><Link className="ad-btn-link" to="/admin/adoptions">← กลับไปรายการคำขอ</Link></>;
   return <CaseWorkspace key={item.id} item={item} />;
 }
 
 function CaseWorkspace({ item }: { item: AdoptionCase }) {
   const data = usePreview();
-  const now = previewNow(data);
+  const now = Date.now();
   const [params] = useSearchParams();
   const [prompt, setPrompt] = useState<Prompt | null>(null);
   const { confirm, dialog } = useConfirmation();
@@ -115,7 +119,11 @@ function CaseWorkspace({ item }: { item: AdoptionCase }) {
   const policy = followUp(item, now);
   const next = insight(item, now);
   const open = !item.closed && !isTerminal(item.stage);
-  const run = (action: CaseAction, message: string) => { if (data.act(item.id, action)) notify(message); };
+  const run = (action: CaseAction, message: string) => {
+    void realCaseAction(item.id, action, message);
+  };
+  // ไทม์ไลน์โหลดทีละเคสจาก Backend
+  useEffect(() => { void loadTimeline(item.id); }, [item.id]);
   const canVerify = !item.closed && !item.verified && (item.stage === "COMPLETED" || (item.disputed && reportsMatch(item) && item.confirmations.owner && item.confirmations.applicant));
 
   return <>
@@ -150,23 +158,10 @@ function CaseWorkspace({ item }: { item: AdoptionCase }) {
       <p className="ad-mt ad-pre"><span className="ad-muted ad-small">ข้อความถึงเจ้าของ</span><br />{item.message}</p>
     </Card>}
     {tab === "timeline" && <Card title="ไทม์ไลน์"><Timeline item={item} /></Card>}
-    {tab === "notifications" && <Card title="ตัวอย่างแจ้งเตือน 24 / 48 / 72 ชั่วโมง" subtitle="นับจากการดำเนินการสำคัญล่าสุดขณะรอเจ้าของตอบกลับ · ไม่มีการอนุมัติ ปฏิเสธ หรือปิดเคสอัตโนมัติ">
-      {([[24, "แจ้งเตือนเจ้าของครั้งแรก", "ระบบส่งข้อความเตือนเจ้าของโพสต์ (ตัวอย่าง)"],
-        [48, "แจ้งเตือนครั้งที่สอง · Admin ต้องติดตาม", "เคสเข้าคิวติดตามของผู้ดูแล"],
-        [72, "ไม่ตอบกลับ · ส่งต่อเร่งด่วน", "ผู้ดูแลติดต่อเจ้าของ และแนะนำผู้ขอดูน้องตัวอื่นถ้ายังเงียบ"]] as const).map(([hours, title, detail]) =>
-        <div className="ad-threshold" key={hours}>
-          <strong>{hours} ชม.</strong>
-          <div className="ad-min0"><b>{title}</b><p className="ad-muted ad-small">{detail}</p></div>
-          <Badge tone={item.stage !== "PENDING" ? "neutral" : policy.idle >= hours ? "warning" : "navy"}>
-            {item.stage !== "PENDING" ? "พ้นช่วงรอเจ้าของ" : policy.idle >= hours ? "ถึงเกณฑ์" : `อีก ${hours - policy.idle} ชม.`}
-          </Badge>
-        </div>)}
-      <p className="ad-muted ad-small ad-mt">การบันทึกว่าผู้ดูแลติดต่อแล้วไม่รีเซ็ตเวลาที่เจ้าของไม่ตอบกลับ</p>
-    </Card>}
     {tab === "notes" && <Card title="บันทึกติดตามของผู้ดูแล"><Timeline item={item} notesOnly /></Card>}
     {tab === "handover" && <Card title="รายงานและการยืนยันการส่งมอบ"><HandoverDetails item={item} /></Card>}
 
-    <Card title="การดำเนินการของผู้ดูแล" subtitle="มีผลกับข้อมูลจำลองเท่านั้น · ผู้ดูแลไม่เลือกผู้รับเลี้ยงแทนเจ้าของ">
+    <Card title="การดำเนินการของผู้ดูแล" subtitle="มีผลกับข้อมูลจริงและบันทึกใน Audit Log · ผู้ดูแลไม่เลือกผู้รับเลี้ยงแทนเจ้าของ">
       <div className="ad-row">
         {open && <>
           <button type="button" className="ad-btn" onClick={() => run({ type: item.flagged ? "unflag" : "flag" }, item.flagged ? "นำธงออกแล้ว" : "ตั้งธงต้องติดตามแล้ว")}>
@@ -180,7 +175,10 @@ function CaseWorkspace({ item }: { item: AdoptionCase }) {
             title: "ทำเครื่องหมายข้อพิพาท", description: "เคสจะเข้าคิวตรวจสอบ และปิดเป็นสำเร็จได้หลังผู้ดูแลยืนยันผลตรวจเท่านั้น", label: "ทำเครื่องหมาย", danger: true,
             action: () => run({ type: "markDisputed" }, "ทำเครื่องหมายข้อพิพาทแล้ว"),
           })}>ทำเครื่องหมายข้อพิพาท</button>}
-          <Link className="ad-btn" to={`/admin/workflow-preview?case=${item.id}`}>เปิดมุมมองเจ้าของ / ผู้ขอ</Link>
+        </>}
+        {item.legacy && !item.closed && <>
+          <button type="button" className="ad-btn ad-btn-success" onClick={() => setPrompt("legacyComplete")}>ยืนยันว่าส่งมอบแล้ว</button>
+          <button type="button" className="ad-btn ad-btn-warning" onClick={() => setPrompt("legacyReopen")}>ยังไม่ได้ส่งมอบ</button>
         </>}
         {canVerify && <button type="button" className="ad-btn ad-btn-primary" onClick={() => setPrompt("verify")}>ยืนยันผลตรวจสอบการส่งมอบ</button>}
         {!item.closed && isTerminal(item.stage) && <button type="button" className="ad-btn" onClick={() => confirm({
@@ -189,12 +187,14 @@ function CaseWorkspace({ item }: { item: AdoptionCase }) {
         })}>ปิดเคส</button>}
         {item.closed && <p className="ad-muted">เคสนี้ปิดแล้ว</p>}
       </div>
+      {item.legacy && <p className="ad-muted ad-small ad-mt">คำขอนี้อนุมัติจากระบบเดิมโดยไม่มีหลักฐานส่งมอบ · ติดต่อทั้งสองฝ่ายแล้วบันทึกผลพร้อมเหตุผล</p>}
       {item.disputed && !canVerify && <p className="ad-muted ad-small ad-mt">ยืนยันผลตรวจได้เมื่อรายงานสองฝ่ายตรงกันและทั้งคู่ยืนยันแล้ว</p>}
     </Card>
 
-    {prompt && <NotePrompt title={promptTitle[prompt]} verify={prompt === "verify"} onClose={() => setPrompt(null)} onSave={(note) => {
+    {prompt && <NotePrompt title={promptTitle[prompt]} verify={prompt !== "contact" && prompt !== "note"} onClose={() => setPrompt(null)} onSave={(note) => {
       setPrompt(null);
-      if (prompt === "verify") confirm({ title: promptTitle.verify, description: "บันทึกผลตรวจและยืนยันว่าการส่งมอบเกิดขึ้นจริง (ข้อมูลจำลอง)", label: "ยืนยันผลตรวจ", action: () => run({ type: "verify", note }, "ยืนยันผลตรวจสอบแล้ว") });
+      if (prompt === "verify") confirm({ title: promptTitle.verify, description: "บันทึกผลตรวจและยืนยันว่าการส่งมอบเกิดขึ้นจริง · น้องจะเปลี่ยนเป็นได้บ้านแล้ว", label: "ยืนยันผลตรวจ", action: () => run({ type: "verify", note }, "ยืนยันผลตรวจสอบแล้ว") });
+      else if (prompt === "legacyComplete" || prompt === "legacyReopen") run({ type: prompt, note }, prompt === "legacyComplete" ? "ยืนยันการส่งมอบแล้ว" : "เปิดเคสให้ดำเนินการส่งมอบต่อแล้ว");
       else run({ type: prompt, note }, prompt === "contact" ? "บันทึกการติดต่อแล้ว" : "เพิ่มบันทึกแล้ว");
     }} />}
     {dialog}
@@ -239,7 +239,8 @@ export function HandoverDetails({ item }: { item: AdoptionCase }) {
               <div><dt>สถานะ</dt><dd>{handoverLabel[report.status]}</dd></div>
             </dl>
             {report.note && <p className="ad-pre ad-muted">{report.note}</p>}
-            {report.evidence && <button type="button" className="ad-btn" onClick={() => setEvidence(party)}>ดูหลักฐานตัวอย่าง</button>}
+            {report.evidenceUrl ? <a className="ad-btn" href={report.evidenceUrl} target="_blank" rel="noopener noreferrer">ดูรูปหลักฐาน</a>
+              : report.evidence && <button type="button" className="ad-btn" onClick={() => setEvidence(party)}>ดูหลักฐานตัวอย่าง</button>}
           </> : <p className="ad-muted">ยังไม่มีรายงาน</p>}
           <Badge tone={item.confirmations[party] ? "success" : "neutral"}>{item.confirmations[party] ? "✓ ยืนยันแล้ว" : "ยังไม่ยืนยัน"}</Badge>
         </section>;

@@ -92,7 +92,7 @@ export default function RootLayout() {
       <footer className="bg-navy-dark text-white/80 text-sm">
         <div className="mx-auto max-w-6xl px-4 py-6 flex flex-wrap justify-between gap-2">
           <span>© 2026 PawHome · Final Project</span>
-          <span>ข้อมูลสัตว์เป็นข้อมูลจำลอง · รูปน้อง: Dog CEO, TheCatAPI · ภาพแมวหน้าแรก: Claire Abdo / Unsplash</span>
+          <span>รูปน้องตัวอย่าง: Dog CEO, TheCatAPI · ภาพแมวหน้าแรก: Claire Abdo / Unsplash</span>
         </div>
       </footer>
 

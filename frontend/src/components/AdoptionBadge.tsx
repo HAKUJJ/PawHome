@@ -1,16 +1,17 @@
-import { adoptionStatusLabel, type AdoptionStatus } from "../types/adoption";
+import { adoptionLabel, type AdoptionRequest } from "../types/adoption";
 
-const tone: Record<AdoptionStatus, string> = {
-  PENDING: "bg-sand text-ink",
-  APPROVED: "bg-navy text-white",
-  REJECTED: "bg-danger/10 text-danger",
-};
-
-// ป้ายสถานะคำขอรับเลี้ยง
-export default function AdoptionBadge({ status }: { status: AdoptionStatus }) {
+// ป้ายสถานะคำขอรับเลี้ยง: ใช้ขั้นตอนละเอียด (stage) ถ้า Backend ส่งมา ไม่งั้นใช้ status เดิม
+export default function AdoptionBadge({ request }: { request: Pick<AdoptionRequest, "status" | "stage" | "legacyReview"> }) {
+  const stage = request.legacyReview ? undefined : request.stage;
+  const tone = stage === "COMPLETED" ? "bg-navy text-white"
+    : stage && ["ACCEPTED", "ARRANGING_HANDOVER", "HANDOVER_REPORTED"].includes(stage) ? "bg-navy-soft text-navy"
+    : request.status === "APPROVED" ? "bg-navy text-white"
+    : request.status === "REJECTED" ? "bg-danger/10 text-danger"
+    : request.status === "CANCELLED" ? "bg-ground text-muted"
+    : "bg-sand text-ink";
   return (
-    <span className={`inline-flex text-xs font-semibold px-2.5 py-1 rounded-full ${tone[status]}`}>
-      {adoptionStatusLabel[status]}
+    <span className={`inline-flex text-xs font-semibold px-2.5 py-1 rounded-full ${tone}`}>
+      {adoptionLabel(request)}
     </span>
   );
 }

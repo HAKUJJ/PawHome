@@ -1,21 +1,22 @@
-// Admin Preview — โหลดเฉพาะเมื่อ import.meta.env.DEV && VITE_ADMIN_PREVIEW === "true" (ดู router.tsx)
-// ข้อมูลทั้งหมดเป็น Mock ในหน่วยความจำ ไม่เรียก API และไม่มีสิทธิ์ผู้ดูแลจริง
+// หน้า Admin — ข้อมูลจริงจาก Backend เท่านั้น
+// ต้องผ่าน GET /api/admin/me ก่อนแสดงข้อมูลใด ๆ (Backend ตรวจสิทธิ์ทุก request)
 import { useEffect, useState } from "react";
 import { Link, NavLink, Route, Routes, useLocation } from "react-router";
 import { Dialog } from "../components/Dialog";
 import PawLogo from "../components/PawLogo";
 import Toaster from "../components/Toaster";
+import { useAuthStore } from "../stores/useAuthStore";
 import { AdoptionList, CaseDetail } from "./Adoptions";
 import { Announcements } from "./Content";
 import { Dashboard } from "./Dashboard";
-import { AuditLogs, Users } from "./People";
+import { Users } from "./People";
 import { Pets } from "./Pets";
 import { Reports } from "./Reports";
 import { Settings } from "./Settings";
-import { idleText, petOf, previewNow, usePreview, userName } from "./store";
+import { clearAdmin, loadAdmin } from "./real";
+import { petOf, usePreview, userName } from "./store";
 import { Icon, matches, type IconName } from "./ui";
 import { followUp, isTerminal } from "./workflow";
-import { WorkflowPreview } from "./WorkflowPreview";
 import "./admin.css";
 
 const navigation: { group: string; items: { path: string; label: string; icon: IconName }[] }[] = [
@@ -23,13 +24,11 @@ const navigation: { group: string; items: { path: string; label: string; icon: I
   { group: "งานจัดการ", items: [
     { path: "pets", label: "จัดการสัตว์เลี้ยง", icon: "paw" },
     { path: "adoptions", label: "คำขอรับเลี้ยง", icon: "heart" },
-    { path: "workflow-preview", label: "จำลองขั้นตอนรับเลี้ยง", icon: "flow" }, // เมนูนี้มีเฉพาะ Development Preview
     { path: "users", label: "ผู้ใช้งาน", icon: "users" },
     { path: "announcements", label: "ประชาสัมพันธ์", icon: "megaphone" },
   ] },
   { group: "ระบบ", items: [
     { path: "reports", label: "รายงาน", icon: "chart" },
-    { path: "audit-logs", label: "ประวัติกิจกรรม", icon: "clock" },
     { path: "settings", label: "ตั้งค่า", icon: "settings" },
   ] },
 ];
@@ -37,11 +36,9 @@ const allItems = navigation.flatMap((section) => section.items);
 
 function useAttention() {
   const data = usePreview();
-  const now = previewNow(data);
+  const now = Date.now();
   const open = data.cases.filter((item) => !isTerminal(item.stage) && !item.closed).map((item) => ({ item, policy: followUp(item, now) }));
-  const reminders = data.preferences.reminders
-    ? open.filter(({ policy }) => policy.priority !== "normal" && (data.preferences.escalation || policy.priority !== "urgent")) : [];
-  return { data, reminders, counts: { adoptions: open.filter(({ policy }) => policy.required).length, pets: data.pets.filter((pet) => pet.visibility === "review").length } as Record<string, number> };
+  return { data, counts: { adoptions: open.filter(({ policy }) => policy.required).length, pets: data.pets.filter((pet) => pet.visibility === "review").length } as Record<string, number> };
 }
 
 function Navigation() {
@@ -59,14 +56,57 @@ function Navigation() {
 }
 
 function Brand() {
-  return <Link to="/admin" className="ad-brand"><span><PawLogo className="ad-brand-paw" /></span><span>PawHome<small>พื้นที่ผู้ดูแล · พรีวิว</small></span></Link>;
+  return <Link to="/admin" className="ad-brand"><span><PawLogo className="ad-brand-paw" /></span><span>PawHome<small>พื้นที่ผู้ดูแล</small></span></Link>;
 }
 
+// Real Mode: ยังไม่ยืนยันสิทธิ์ → ไม่แสดง layout/ข้อมูลใด ๆ
 export function Component() {
+  const status = usePreview((state) => state.status);
+  const token = useAuthStore((state) => state.token);
+
+  // ล็อกอิน / ออกจากระบบ / แท็บอื่นเปลี่ยน session (useAuthStore rehydrate จาก storage event) → ตรวจสิทธิ์ใหม่
+  useEffect(() => {
+    if (token) void loadAdmin();
+    else clearAdmin("unauthorized");
+  }, [token]);
+
+  if (status !== "ready") return <AdminGate />;
+  return <AdminLayout />;
+}
+
+function AdminGate() {
+  const { status, error } = usePreview();
   const location = useLocation();
-  const [open, setOpen] = useState<"menu" | "search" | "notifications" | null>(null);
+  const content = {
+    checking: <p role="status" className="ad-muted">กำลังตรวจสอบสิทธิ์ผู้ดูแล…</p>,
+    unauthorized: <>
+      <h1>เข้าสู่ระบบผู้ดูแล</h1>
+      <p className="ad-muted">กรุณาเข้าสู่ระบบด้วยบัญชีที่ได้รับสิทธิ์ผู้ดูแล</p>
+      <Link className="ad-btn ad-btn-primary" to={`/login?redirect=${encodeURIComponent(location.pathname)}`}>เข้าสู่ระบบ</Link>
+    </>,
+    forbidden: <>
+      <h1>ไม่มีสิทธิ์เข้าถึง</h1>
+      <p className="ad-muted">{error || "บัญชีนี้ไม่มีสิทธิ์เข้าถึงส่วนผู้ดูแล"}</p>
+      <Link className="ad-btn" to="/">กลับเว็บไซต์ PawHome</Link>
+    </>,
+    error: <>
+      <h1>เชื่อมต่อระบบไม่สำเร็จ</h1>
+      <p className="ad-muted">{error}</p>
+      <button type="button" className="ad-btn ad-btn-primary" onClick={() => void loadAdmin()}>ลองใหม่</button>
+    </>,
+    ready: null,
+  }[status];
+  return <div className="ad ad-gate"><main className="ad-card ad-stack">
+    <span className="ad-brand"><span><PawLogo className="ad-brand-paw" /></span><span>PawHome<small>พื้นที่ผู้ดูแล</small></span></span>
+    {content}
+  </main></div>;
+}
+
+function AdminLayout() {
+  const location = useLocation();
+  const [open, setOpen] = useState<"menu" | "search" | null>(null);
   const [query, setQuery] = useState("");
-  const { data, reminders } = useAttention();
+  const { data } = useAttention();
   const segment = location.pathname.split("/")[2] ?? "";
   const page = allItems.find((item) => item.path === segment);
   const caseResults = query.trim() ? data.cases.filter((item) => {
@@ -82,7 +122,7 @@ export function Component() {
 
   useEffect(() => {
     const previous = document.title;
-    document.title = `${page?.label ?? "ผู้ดูแล"} | PawHome Admin Preview`;
+    document.title = `${page?.label ?? "ผู้ดูแล"} | PawHome Admin`;
     return () => { document.title = previous; };
   }, [page]);
 
@@ -101,24 +141,19 @@ export function Component() {
           <button type="button" className="ad-search" aria-haspopup="dialog" aria-label="ค้นหา" onClick={() => { setQuery(""); setOpen("search"); }}>
             <Icon name="search" /><span>ค้นหาน้อง / เจ้าของ / เคส…</span>
           </button>
-          <button type="button" className="ad-icon-btn" aria-haspopup="dialog" aria-label={`การแจ้งเตือนจำลอง ${reminders.length} รายการ`} onClick={() => setOpen("notifications")}>
-            <Icon name="bell" />{reminders.length > 0 && <span className="ad-dot" />}
-          </button>
-          <Link to="/admin/settings" className="ad-profile" aria-label="ตั้งค่าโปรไฟล์ผู้ดูแล"><span className="ad-avatar" aria-hidden="true">{data.preferences.name.slice(0, 1)}</span><span>{data.preferences.name} (พรีวิว)</span></Link>
+          <Link to="/admin/settings" className="ad-profile" aria-label="ตั้งค่าโปรไฟล์ผู้ดูแล"><span className="ad-avatar" aria-hidden="true">{data.preferences.name.slice(0, 1)}</span><span>{data.preferences.name}{data.me?.role === "SUPER_ADMIN" ? " (ผู้ดูแลสูงสุด)" : ""}</span></Link>
         </div>
       </header>
       <main id="admin-content" className="ad-main" tabIndex={-1}>
-        <p className="ad-env"><strong>โหมดตัวอย่าง</strong>ข้อมูลจำลองในเบราว์เซอร์นี้เท่านั้น · ไม่เชื่อมต่อระบบจริง · รีเฟรชแล้วข้อมูลกลับเป็นค่าเริ่มต้น</p>
+        <p className="ad-env ad-env-real"><strong>ข้อมูลจริง</strong>ทุกการกระทำมีผลกับเว็บไซต์ PawHome และถูกบันทึกใน Audit Log</p>
         <Routes>
           <Route index element={<Dashboard />} />
           <Route path="pets" element={<Pets />} />
           <Route path="adoptions" element={<AdoptionList />} />
           <Route path="adoptions/:id" element={<CaseDetail />} />
-          <Route path="workflow-preview" element={<WorkflowPreview />} />
           <Route path="users" element={<Users />} />
           <Route path="announcements" element={<Announcements />} />
           <Route path="reports" element={<Reports />} />
-          <Route path="audit-logs" element={<AuditLogs />} />
           <Route path="settings" element={<Settings />} />
           <Route path="*" element={<section className="ad-card"><h1 className="ad-sr">ไม่พบหน้า</h1><p>ไม่พบหน้าผู้ดูแลนี้</p><Link className="ad-btn-link" to="/admin">กลับหน้าภาพรวม</Link></section>} />
         </Routes>
@@ -138,11 +173,6 @@ export function Component() {
           {query.trim() && !menuResults.length && !caseResults.length && <li className="ad-muted">ไม่พบผลการค้นหา</li>}
         </ul>
       </div>
-    </Dialog>}
-    {open === "notifications" && <Dialog title="การแจ้งเตือนจำลอง" onClose={() => setOpen(null)}>
-      {!reminders.length ? <p className="ad-muted">ไม่มีการแจ้งเตือนในขณะนี้</p> : <ul className="ad-list">{reminders.map(({ item, policy }) =>
-        <li key={item.id}><Link className="ad-btn-link" onClick={() => setOpen(null)} to={`/admin/adoptions/${item.id}`}>{petOf(data, item.petId)?.name} · {item.id}</Link><span className="ad-muted ad-small">เงียบ {idleText(policy.hours)}</span></li>)}</ul>}
-      <p className="ad-muted ad-small ad-mt">ตัวอย่างเท่านั้น ไม่มีการส่งอีเมลหรือ SMS จริง</p>
     </Dialog>}
   </div>;
 }

@@ -1,8 +1,10 @@
 import { useState, type FormEvent } from "react";
 import { useConfirmation } from "../components/ConfirmDialog";
 import { Dialog } from "../components/Dialog";
+import { adminApi, fromAnnouncement } from "./api";
+import { mutateAdmin } from "./real";
 import { formatDate, usePreview, type Announcement } from "./store";
-import { Badge, Card, Chips, Empty, Field, Icon, notify, PageHeader, Select } from "./ui";
+import { Badge, Card, Chips, Empty, Field, Icon, PageHeader, Select } from "./ui";
 
 const blank: Omit<Announcement, "id" | "order"> = { title: "", category: "ประชาสัมพันธ์", description: "", date: "", time: "", location: "", contact: "", cta: "ดูรายละเอียด", destination: "/", published: false };
 
@@ -17,29 +19,25 @@ export function Announcements() {
 
   const save = (entry: Announcement) => {
     const exists = data.announcements.some((item) => item.id === entry.id);
-    data.change(exists ? "แก้ไขประกาศ" : "สร้างประกาศ", entry.title, "ประกาศ", (state) => ({
-      announcements: exists ? state.announcements.map((item) => (item.id === entry.id ? entry : item)) : [...state.announcements, entry],
-    }));
-    setEditing(null);
-    notify(exists ? "บันทึกประกาศจำลองแล้ว" : "สร้างประกาศจำลองแล้ว");
+    void mutateAdmin(() => (exists ? adminApi.updateAnnouncement(entry.id, fromAnnouncement(entry)) : adminApi.createAnnouncement(entry)),
+      exists ? "บันทึกประกาศแล้ว" : "สร้างประกาศแล้ว").then((ok) => ok && setEditing(null));
   };
   const togglePublish = (entry: Announcement) => {
-    data.change(entry.published ? "ยกเลิกการเผยแพร่" : "เผยแพร่ประกาศ", entry.title, "ประกาศ", (state) => ({
-      announcements: state.announcements.map((item) => (item.id === entry.id ? { ...item, published: !item.published } : item)),
-    }));
-    notify(entry.published ? "ย้ายเป็นฉบับร่างแล้ว" : "เผยแพร่ในตัวอย่างแล้ว");
+    void mutateAdmin(() => adminApi.updateAnnouncement(entry.id, { status: entry.published ? "DRAFT" : "PUBLISHED" }), entry.published ? "ย้ายเป็นฉบับร่างแล้ว" : "เผยแพร่ประกาศแล้ว");
   };
   const move = (index: number, direction: -1 | 1) => {
     const other = list[index + direction];
     const entry = list[index];
-    data.change("จัดลำดับประกาศ", entry.title, "ประกาศ", (state) => ({
-      announcements: state.announcements.map((item) => item.id === entry.id ? { ...item, order: other.order } : item.id === other.id ? { ...item, order: entry.order } : item),
-    }));
+    // ลำดับเดิมอาจซ้ำกัน → ใช้ตำแหน่งในรายการเป็นลำดับใหม่ของทั้งสองรายการ
+    void mutateAdmin(async () => {
+      await adminApi.updateAnnouncement(entry.id, { displayOrder: index + direction });
+      await adminApi.updateAnnouncement(other.id, { displayOrder: index });
+    }, "จัดลำดับประกาศแล้ว");
   };
 
   return <>
     <PageHeader title="ประชาสัมพันธ์" action={<button type="button" className="ad-btn ad-btn-primary" onClick={() => setEditing("new")}><Icon name="plus" />สร้างประกาศ</button>}>
-      การ์ดประชาสัมพันธ์บนหน้าแรก · แก้ไขที่นี่ไม่กระทบเว็บไซต์จริง
+      ประกาศที่เผยแพร่แล้วแสดงบนหน้าแรกผ่าน API สาธารณะ
     </PageHeader>
     <Chips label="สถานะประกาศ" value={filter} onChange={setFilter} options={[
       ["all", "ทั้งหมด", list.length], ["published", "เผยแพร่", list.filter((entry) => entry.published).length], ["draft", "ฉบับร่าง", list.filter((entry) => !entry.published).length],
@@ -59,8 +57,8 @@ export function Announcements() {
           <button type="button" className="ad-btn" disabled={index === 0} aria-label={`เลื่อน ${entry.title} ขึ้น`} onClick={() => move(index, -1)}>↑</button>
           <button type="button" className="ad-btn" disabled={index === list.length - 1} aria-label={`เลื่อน ${entry.title} ลง`} onClick={() => move(index, 1)}>↓</button>
           <button type="button" className="ad-btn ad-btn-danger" onClick={() => confirm({
-            title: `ลบประกาศ "${entry.title}"`, description: "ลบออกจากข้อมูลจำลอง (ไม่กระทบประกาศจริง)", label: "ลบประกาศ", danger: true,
-            action: () => { data.change("ลบประกาศ", entry.title, "ประกาศ", (state) => ({ announcements: state.announcements.filter((item) => item.id !== entry.id) })); notify("ลบประกาศจำลองแล้ว"); },
+            title: `ลบประกาศ "${entry.title}"`, description: "ลบได้เฉพาะฉบับร่าง · ประกาศที่เผยแพร่อยู่ต้องยกเลิกการเผยแพร่ก่อน", label: "ลบประกาศ", danger: true,
+            action: () => void mutateAdmin(() => adminApi.deleteAnnouncement(entry.id), "ลบประกาศแล้ว"),
           })}>ลบ</button>
         </div>
       </li>;

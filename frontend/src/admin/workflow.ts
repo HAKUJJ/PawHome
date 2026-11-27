@@ -22,7 +22,8 @@ export interface Handover {
   date: string; // YYYY-MM-DD
   status: "delivered" | "failed";
   note: string;
-  evidence: boolean; // แนบหลักฐานตัวอย่าง (ไม่มีไฟล์จริง)
+  evidence: boolean; // แนบหลักฐาน (Mock = ภาพตัวอย่าง ไม่มีไฟล์จริง)
+  evidenceUrl?: string; // Real Mode: ลิงก์รูปหลักฐานที่อัปโหลดผ่าน PawHome
 }
 export const handoverLabel = { delivered: "ส่งมอบแล้ว", failed: "ยังไม่ได้ส่งมอบ" };
 
@@ -43,6 +44,7 @@ export interface AdoptionCase {
   escalated: boolean;
   closed: boolean;
   verified: boolean;
+  legacy?: boolean; // Real Mode: อนุมัติจากระบบเดิม ยังไม่มีหลักฐานส่งมอบ รอผู้ดูแลตัดสิน
   resolution?: string;
   completedAt?: number;
   reports: Partial<Record<Party, Handover>>;
@@ -55,9 +57,11 @@ export type CaseAction =
   | { type: "report"; party: Party; report: Handover }
   | { type: "confirm" | "dispute"; party: Party }
   | { type: "flag" | "unflag" | "escalate" | "markDisputed" | "close" }
-  | { type: "contact" | "note" | "verify"; note: string };
+  | { type: "contact" | "note" | "verify"; note: string }
+  // Real Mode เท่านั้น: ตัดสินคำขอจากระบบเดิม (ยืนยันว่าส่งมอบแล้ว / ยังไม่ได้ส่งมอบ ให้ดำเนินการต่อ)
+  | { type: "legacyComplete" | "legacyReopen"; note: string };
 
-export const priorityLabel = { normal: "ปกติ", reminder: "แจ้งเตือนแล้ว", high: "ต้องติดตาม", urgent: "ด่วน" };
+export const priorityLabel = { normal: "ปกติ", reminder: "เฝ้าดู", high: "ต้องติดตาม", urgent: "ด่วน" };
 export type Priority = keyof typeof priorityLabel;
 export const priorityRank: Record<Priority, number> = { normal: 0, reminder: 1, high: 2, urgent: 3 };
 

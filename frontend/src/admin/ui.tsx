@@ -2,21 +2,19 @@ import { useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import PetImage from "../components/PetImage";
 import { useToastStore } from "../stores/useToastStore";
-import { idleText, ownerOf, petOf, previewNow, userName, type PreviewData } from "./store";
+import { idleText, ownerOf, petOf, userName, type PreviewData } from "./store";
 import { followUp, isTerminal, priorityRank, reportsMatch, stageLabel, type AdoptionCase, type Priority } from "./workflow";
 
 // ---------- ไอคอนเส้น ----------
 const paths = {
   grid: "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z",
   heart: "M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10Z",
-  flow: "M5 6h10m0 0-3-3m3 3-3 3M19 18H9m0 0 3-3m-3 3 3 3",
   users: "M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm-6 9a6 6 0 0 1 12 0M16 4.5a3.5 3.5 0 0 1 0 6.5M18 14a6 6 0 0 1 3 6",
   megaphone: "M4 10v4l3 .5L9 20h2l-1-5 8 3V6l-11 4H4Z M18 10a2 2 0 0 1 0 4",
   chart: "M4 20V10M10 20V4M16 20v-7M22 20H2",
   clock: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-13v4l3 2",
   settings: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm7.4-3a7.4 7.4 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7.5 7.5 0 0 0-2-1.2L14.5 3h-5l-.4 2.6a7.5 7.5 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6a7.4 7.4 0 0 0 0 2.4l-2 1.6 2 3.4 2.4-1a7.5 7.5 0 0 0 2 1.2l.4 2.6h5l.4-2.6a7.5 7.5 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2Z",
   search: "M10.5 16a5.5 5.5 0 1 0 0-11 5.5 5.5 0 0 0 0 11Zm4.5-1 4 4",
-  bell: "M5 17h14l-2-3V9a5 5 0 0 0-10 0v5l-2 3Zm5 3h4",
   refresh: "M20 12a8 8 0 1 1-2.3-5.7M20 4v4h-4",
   chevron: "m9 6 6 6-6 6",
   back: "m15 6-6 6 6 6",
@@ -152,15 +150,15 @@ export function insight(item: AdoptionCase, now: number): { reason: string; acti
   }
 }
 
-export function byUrgency(data: PreviewData, cases: AdoptionCase[]) {
-  const now = previewNow(data);
+export function byUrgency(cases: AdoptionCase[]) {
+  const now = Date.now();
   return cases.map((item) => ({ item, policy: followUp(item, now) }))
     .sort((a, b) => Number(isTerminal(a.item.stage) || a.item.closed) - Number(isTerminal(b.item.stage) || b.item.closed) ||
       priorityRank[b.policy.priority] - priorityRank[a.policy.priority] || b.policy.hours - a.policy.hours);
 }
 
 export function CaseRow({ data, item }: { data: PreviewData; item: AdoptionCase }) {
-  const now = previewNow(data);
+  const now = Date.now();
   const pet = petOf(data, item.petId);
   const policy = followUp(item, now);
   const next = insight(item, now);

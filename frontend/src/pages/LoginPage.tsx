@@ -2,7 +2,6 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link, Navigate, useSearchParams } from "react-router";
 import { Field, inputClass } from "../components/Field";
 import AuthShell from "../components/AuthShell";
-import { USE_MOCK } from "../api/client";
 import { useLogin } from "../hooks/useAuth";
 import { useAuthStore } from "../stores/useAuthStore";
 import { EMAIL_PATTERN, safeRedirect } from "../types/user";
@@ -75,12 +74,6 @@ export default function LoginPage() {
           {login.isPending ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}
         </button>
       </form>
-
-      {USE_MOCK && (
-        <p className="text-sm bg-navy-soft text-navy rounded-xl p-3">
-          โหมดข้อมูลจำลอง: ลองใช้ <b>pong@pawhome.test</b> รหัส <b>123456</b>
-        </p>
-      )}
 
       <p className="text-center text-muted">
         ยังไม่มีบัญชี?{" "}

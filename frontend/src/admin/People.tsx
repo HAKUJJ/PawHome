@@ -2,8 +2,10 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { useConfirmation } from "../components/ConfirmDialog";
 import { Dialog } from "../components/Dialog";
-import { ago, formatDate, formatDateTime, petOf, petStatus, previewNow, usePreview, type Audit } from "./store";
-import { Badge, Card, DataTable, Empty, matches, notify, PageHeader, SearchInput, Select, stageTone, Thumb, usePaged } from "./ui";
+import { adminApi } from "./api";
+import { mutateAdmin } from "./real";
+import { formatDate, petOf, petStatus, usePreview } from "./store";
+import { Badge, Card, DataTable, Empty, Field, matches, PageHeader, SearchInput, Select, stageTone, Thumb, usePaged } from "./ui";
 import { isTerminal, stageLabel } from "./workflow";
 
 export function Users() {
@@ -12,6 +14,7 @@ export function Users() {
   const [role, setRole] = useState<"all" | "member" | "admin">("all");
   const [status, setStatus] = useState<"all" | "active" | "suspended">("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [suspending, setSuspending] = useState<string | null>(null);
   const { confirm, dialog } = useConfirmation();
   const filtered = data.users.filter((user) => (role === "all" || user.role === role) &&
     (status === "all" || (status === "suspended") === user.suspended) && matches(query, user.name, user.province));
@@ -22,21 +25,15 @@ export function Users() {
 
   const toggle = (id: string) => {
     const user = data.users.find((entry) => entry.id === id)!;
+    if (!user.suspended) { setSuspending(id); return; }
     confirm({
-      title: `${user.suspended ? "เปิดใช้งาน" : "ระงับ"}บัญชี ${user.name}`,
-      description: user.suspended ? "ผู้ใช้จะกลับมาใช้งานได้ (ตัวอย่าง ไม่แก้บัญชีจริง)" : "ผู้ใช้จะเข้าสู่ระบบและส่งคำขอไม่ได้ (ตัวอย่าง ไม่แก้บัญชีจริง)",
-      label: user.suspended ? "เปิดใช้งาน" : "ระงับบัญชี", danger: !user.suspended,
-      action: () => {
-        data.change(user.suspended ? "เปิดใช้งานบัญชี" : "ระงับบัญชี", user.name, "ผู้ใช้", (state) => ({
-          users: state.users.map((entry) => (entry.id === id ? { ...entry, suspended: !entry.suspended } : entry)),
-        }));
-        notify(`${user.suspended ? "เปิดใช้งาน" : "ระงับ"}บัญชีจำลองแล้ว`);
-      },
+      title: `เปิดใช้งานบัญชี ${user.name}`, description: "ผู้ใช้จะกลับมาเข้าสู่ระบบและส่งคำขอได้", label: "เปิดใช้งาน",
+      action: () => void mutateAdmin(() => adminApi.unsuspend(id), "เปิดใช้งานบัญชีแล้ว"),
     });
   };
 
   return <>
-    <PageHeader title="ผู้ใช้งาน">สมาชิกที่โพสต์หาบ้านและขอรับเลี้ยง · ข้อมูลจำลอง ไม่แสดงอีเมลหรือเบอร์โทรจริง</PageHeader>
+    <PageHeader title="ผู้ใช้งาน">สมาชิกที่โพสต์หาบ้านและขอรับเลี้ยง · ไม่แสดงอีเมลหรือเบอร์โทร</PageHeader>
     <Card>
       <div className="ad-filters">
         <div className="ad-field-wide"><SearchInput label="ค้นหาผู้ใช้" value={query} onChange={(value) => { setQuery(value); reset(); }} placeholder="ชื่อหรือจังหวัด" /></div>
@@ -71,44 +68,23 @@ export function Users() {
         {selected.role !== "admin" && <button type="button" className={`ad-btn ${selected.suspended ? "" : "ad-btn-danger"}`} onClick={() => toggle(selected.id)}>{selected.suspended ? "เปิดใช้งานบัญชี" : "ระงับบัญชี"}</button>}
       </div>
     </Dialog>}
+    {suspending && <SuspendDialog name={data.users.find((u) => u.id === suspending)?.name ?? ""} onClose={() => setSuspending(null)}
+      onSave={(reason) => void mutateAdmin(() => adminApi.suspend(suspending, reason), "ระงับบัญชีแล้ว").then((ok) => ok && setSuspending(null))} />}
     {dialog}
   </>;
 }
 
-const categories: Audit["category"][] = ["เคส", "สัตว์เลี้ยง", "ผู้ใช้", "ประกาศ", "ระบบ"];
-
-export function AuditLogs() {
-  const data = usePreview();
-  const now = previewNow(data);
-  const [query, setQuery] = useState("");
-  const [category, setCategory] = useState<Audit["category"] | "all">("all");
-  const [selected, setSelected] = useState<Audit | null>(null);
-  const filtered = data.logs.filter((entry) => (category === "all" || entry.category === category) && matches(query, entry.actor, entry.action, entry.target, entry.note));
-  const { rows, pager, reset } = usePaged(filtered, 12);
-
-  return <>
-    <PageHeader title="ประวัติกิจกรรม">ทุกการกระทำในพรีวิวถูกบันทึกที่นี่ (ข้อมูลจำลอง) · {data.logs.length} รายการ</PageHeader>
-    <Card>
-      <div className="ad-filters">
-        <div className="ad-field-wide"><SearchInput label="ค้นหากิจกรรม" value={query} onChange={(value) => { setQuery(value); reset(); }} placeholder="ผู้ทำ การกระทำ หรือเป้าหมาย" /></div>
-        <Select label="หมวด" value={category} onChange={(value) => { setCategory(value); reset(); }} options={[["all", "ทุกหมวด"], ...categories.map((name) => [name, name] as const)]} />
+function SuspendDialog({ name, onClose, onSave }: { name: string; onClose: () => void; onSave: (reason: string) => void }) {
+  const [reason, setReason] = useState("");
+  return <Dialog title={`ระงับบัญชี ${name}`} onClose={onClose}>
+    <form className="ad-stack" onSubmit={(event) => { event.preventDefault(); if (reason.trim().length >= 5) onSave(reason.trim()); }}>
+      <p className="ad-muted">ผู้ใช้จะเข้าใช้งานและส่งคำขอไม่ได้จนกว่าจะเปิดใช้งานอีกครั้ง · เหตุผลถูกบันทึกใน Audit Log</p>
+      <Field label="เหตุผลที่ระงับ (อย่างน้อย 5 ตัวอักษร)"><textarea required minLength={5} maxLength={500} rows={3} value={reason} onChange={(event) => setReason(event.target.value)} /></Field>
+      <div className="ad-row">
+        <button type="button" className="ad-btn" onClick={onClose}>กลับ</button>
+        <button type="submit" className="ad-btn ad-btn-danger" disabled={reason.trim().length < 5}>ระงับบัญชี</button>
       </div>
-      {filtered.length ? <DataTable label="ตารางประวัติกิจกรรม" headers={["เวลา", "ผู้ทำ", "การกระทำ", "เป้าหมาย", "หมวด", ""]}>
-        {rows.map((entry) => <tr key={entry.id}>
-          <td title={formatDateTime(entry.at)}>{ago(entry.at, now)}</td><td>{entry.actor}</td><td>{entry.action}</td>
-          <td><span className="ad-name-cell">{entry.target}</span></td><td><Badge>{entry.category}</Badge></td>
-          <td><button type="button" className="ad-btn" aria-label={`ดูกิจกรรม ${entry.action} ${entry.target}`} onClick={() => setSelected(entry)}>รายละเอียด</button></td>
-        </tr>)}
-      </DataTable> : <Empty title="ไม่พบกิจกรรม" />}
-      {pager}
-    </Card>
-    {selected && <Dialog title={selected.action} drawer onClose={() => setSelected(null)}>
-      <dl className="ad-details">
-        <div><dt>ผู้ทำ</dt><dd>{selected.actor}</dd></div><div><dt>หมวด</dt><dd>{selected.category}</dd></div>
-        <div><dt>เป้าหมาย</dt><dd>{selected.target}</dd></div><div><dt>เวลา</dt><dd>{formatDateTime(selected.at)}</dd></div>
-      </dl>
-      {selected.note && <p className="ad-pre ad-mt">“{selected.note}”</p>}
-      {selected.target.startsWith("AD-") && <Link className="ad-btn ad-mt" to={`/admin/adoptions/${selected.target}`}>เปิดเคส {selected.target}</Link>}
-    </Dialog>}
-  </>;
+    </form>
+  </Dialog>;
 }
+

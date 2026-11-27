@@ -6,6 +6,11 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  arrangeHandover,
+  confirmHandover,
+  disputeHandover,
+  getAdoptionTimeline,
+  reportHandover,
   cancelAdoption,
   createAdoption,
   getMyAdoptions,
@@ -15,12 +20,17 @@ import {
 } from "../api/adoptions";
 import { useAuthStore } from "../stores/useAuthStore";
 import { toast } from "../stores/useToastStore";
-import type { AdoptionInput } from "../types/adoption";
+import type { AdoptionInput, HandoverInput } from "../types/adoption";
 
 export const adoptionKeys = {
   mine: ["me", "adoptions"] as const,
   ofPet: (petId: number) => ["pets", "adoptions", petId] as const,
+  timeline: (id: number) => ["me", "adoptions", "timeline", id] as const,
 };
+
+export function useAdoptionTimeline(id: number, enabled: boolean) {
+  return useQuery({ queryKey: adoptionKeys.timeline(id), queryFn: ({ signal }) => getAdoptionTimeline(id, signal), enabled });
+}
 
 export function useMyAdoptions() {
   const user = useAuthStore((s) => s.user);
@@ -76,10 +86,31 @@ export function useReviewAdoption() {
   const refresh = useRefreshAdoptions();
   return useMutation({
     mutationFn: ({ id, status }: { id: number; status: ReviewStatus }) => reviewAdoption(id, status),
-    onSuccess: (_data, { status }) => {
-      toast(status === "APPROVED" ? "อนุมัติแล้ว น้องได้บ้านแล้ว" : "บันทึกว่าไม่ผ่านแล้ว", status === "APPROVED" ? "success" : "info");
+    onSuccess: (data, { status }) => {
+      // ขั้นตอนส่งมอบ: ตอบรับ ≠ ได้บ้านแล้ว · โหมดเดิม: อนุมัติ = ได้บ้านแล้ว
+      const accepted = data?.stage === "ACCEPTED" && !data.legacyReview;
+      toast(status === "REJECTED" ? "บันทึกว่าไม่ผ่านแล้ว" : accepted ? "ตอบรับแล้ว ขั้นต่อไปคือนัดส่งมอบน้อง" : "อนุมัติแล้ว น้องได้บ้านแล้ว", status === "APPROVED" ? "success" : "info");
       return refresh();
     },
     onError: (error) => toast(error.message, "error"),
   });
 }
+
+// การกระทำในขั้นตอนส่งมอบ: เรียก Backend แล้วโหลดคำขอ/สถานะน้องใหม่ (Backend ตรวจสิทธิ์และขั้นเดิมทุกครั้ง)
+function useHandoverAction<T>(run: (input: T) => Promise<unknown>, message: string) {
+  const refresh = useRefreshAdoptions();
+  return useMutation({
+    mutationFn: run,
+    onSuccess: () => {
+      toast(message);
+      return refresh();
+    },
+    onError: (error) => toast(error.message, "error"),
+  });
+}
+export const useArrangeHandover = () => useHandoverAction((id: number) => arrangeHandover(id), "เริ่มนัดส่งมอบแล้ว");
+export const useReportHandover = () =>
+  useHandoverAction(({ id, input }: { id: number; input: HandoverInput }) => reportHandover(id, input), "บันทึกรายงานส่งมอบแล้ว");
+export const useConfirmHandover = () => useHandoverAction((id: number) => confirmHandover(id), "ยืนยันรายละเอียดการส่งมอบแล้ว");
+export const useDisputeHandover = () =>
+  useHandoverAction(({ id, note }: { id: number; note: string }) => disputeHandover(id, note), "แจ้งปัญหาแล้ว ผู้ดูแลจะช่วยตรวจสอบ");

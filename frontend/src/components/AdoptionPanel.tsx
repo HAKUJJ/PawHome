@@ -2,10 +2,12 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import { Link, useLocation } from "react-router";
 import { useCancelAdoption, useCreateAdoption, useMyAdoptions } from "../hooks/useAdoptions";
 import { useAuthStore } from "../stores/useAuthStore";
-import { housingLabel, type AdoptionInput, type AdoptionRequest, type Housing } from "../types/adoption";
+import { useHandoverEnabled } from "../hooks/useSite";
+import { canCancel, housingLabel, type AdoptionInput, type AdoptionRequest, type Housing } from "../types/adoption";
 import { timeAgo, type Pet } from "../types/pet";
 import AdoptionBadge from "./AdoptionBadge";
 import { useConfirmation } from "./ConfirmDialog";
+import HandoverPanel from "./HandoverPanel";
 import { Field, inputClass } from "./Field";
 
 // กล่อง "ขอรับเลี้ยง" ในหน้ารายละเอียด (สำหรับคนที่ไม่ใช่เจ้าของโพสต์)
@@ -52,11 +54,14 @@ export default function AdoptionPanel({ pet }: { pet: Pet }) {
 
 function MyRequestStatus({ request }: { request: AdoptionRequest }) {
   const cancel = useCancelAdoption();
+  const handoverEnabled = useHandoverEnabled();
+  const stage = request.stage ?? (request.status === "APPROVED" ? "ACCEPTED" : request.status);
+  const inWorkflow = handoverEnabled && !request.legacyReview && Boolean(request.stage);
   const { confirm, dialog } = useConfirmation();
 
   const handleCancel = () => confirm({
     title: "ยกเลิกคำขอรับเลี้ยง",
-    description: "ผู้โพสต์จะไม่เห็นคำขอนี้อีก ถ้าเปลี่ยนใจต้องยื่นคำขอใหม่",
+    description: stage === "PENDING" ? "ผู้โพสต์จะไม่เห็นคำขอนี้อีก ถ้าเปลี่ยนใจต้องยื่นคำขอใหม่" : "ผู้โพสต์ตอบรับคุณแล้ว การยกเลิกจะแจ้งให้ผู้โพสต์ทราบ และยื่นคำขอใหม่กับน้องตัวนี้ไม่ได้",
     label: "ยกเลิกคำขอ",
     danger: true,
     action: () => cancel.mutate(request.id),
@@ -66,13 +71,14 @@ function MyRequestStatus({ request }: { request: AdoptionRequest }) {
     <Box title="คำขอรับเลี้ยงของคุณ">
       {dialog}
       <div className="flex flex-wrap items-center gap-2">
-        <AdoptionBadge status={request.status} />
+        <AdoptionBadge request={request} />
         <span className="text-sm text-muted">ยื่นเมื่อ {timeAgo(request.createdAt)}</span>
       </div>
-      {request.status === "PENDING" && <p className="text-muted">ผู้โพสต์จะติดต่อกลับทางเบอร์ {request.phone}</p>}
-      {request.status === "APPROVED" && <p>ยินดีด้วย! ผู้โพสต์อนุมัติแล้ว รอผู้โพสต์โทรนัดรับน้องได้เลย</p>}
+      {stage === "PENDING" && <p className="text-muted">ผู้โพสต์จะติดต่อกลับทางเบอร์ {request.phone}</p>}
+      {request.status === "APPROVED" && !inWorkflow && <p>ยินดีด้วย! ผู้โพสต์อนุมัติแล้ว รอผู้โพสต์โทรนัดรับน้องได้เลย</p>}
       {request.status === "REJECTED" && <p className="text-muted">ครั้งนี้ยังไม่ผ่าน ลองดูน้องตัวอื่นที่รอบ้านอยู่นะ</p>}
-      {request.status === "PENDING" && (
+      {(inWorkflow || request.legacyReview) && <HandoverPanel request={request} party="APPLICANT" />}
+      {canCancel(request, handoverEnabled) && (
         <button
           type="button"
           onClick={handleCancel}

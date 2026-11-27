@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router";
 import AdoptionBadge from "../components/AdoptionBadge";
+import HandoverPanel from "../components/HandoverPanel";
+import { useHandoverEnabled, useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications } from "../hooks/useSite";
 import { useConfirmation } from "../components/ConfirmDialog";
 import { Field, inputClass } from "../components/Field";
 import PetCard from "../components/PetCard";
@@ -13,16 +15,17 @@ import { useFavorites } from "../hooks/useFavorites";
 import { useDeletePet, useMyPets } from "../hooks/usePets";
 import { useAuthStore } from "../stores/useAuthStore";
 import type { AdoptionRequest } from "../types/adoption";
-import { housingLabel } from "../types/adoption";
+import { canCancel, housingLabel } from "../types/adoption";
 import type { Pet } from "../types/pet";
 import { timeAgo } from "../types/pet";
 import type { User } from "../types/user";
 
-type Tab = "profile" | "posts" | "requests";
+type Tab = "profile" | "posts" | "requests" | "notifications";
 const tabs: { value: Tab; label: string }[] = [
   { value: "profile", label: "ข้อมูลส่วนตัว" },
   { value: "posts", label: "โพสต์ของฉัน" },
   { value: "requests", label: "คำขอรับเลี้ยง" },
+  { value: "notifications", label: "การแจ้งเตือน" },
 ];
 
 // /me — บัญชีของฉัน (ต้องล็อกอิน) · รายการโปรดอยู่หน้า /favorites หน้าเดียว
@@ -37,6 +40,7 @@ export default function MyPage() {
   const counts: Partial<Record<Tab, number>> = {
     posts: useMyPets().data?.length,
     requests: useMyAdoptions().data?.length,
+    notifications: useNotifications().data?.unread || undefined, // จำนวนที่ยังไม่อ่าน
   };
 
   return (
@@ -67,6 +71,7 @@ export default function MyPage() {
         {tab === "profile" && <Profile user={user} />}
         {tab === "posts" && <MyPosts />}
         {tab === "requests" && <MyRequests />}
+        {tab === "notifications" && <Notifications />}
       </div>
     </section>
   );
@@ -264,6 +269,7 @@ function MyRequests() {
 
 function RequestRow({ request }: { request: AdoptionRequest }) {
   const cancel = useCancelAdoption();
+  const handoverEnabled = useHandoverEnabled();
   const { confirm, dialog } = useConfirmation();
 
   const handleCancel = () => confirm({
@@ -283,7 +289,7 @@ function RequestRow({ request }: { request: AdoptionRequest }) {
           <Link to={`/pets/${request.petId}`} className="font-display font-semibold text-lg hover:text-navy underline-offset-4 hover:underline">
             {request.pet.name}
           </Link>
-          <AdoptionBadge status={request.status} />
+          <AdoptionBadge request={request} />
         </div>
         <p className="text-sm text-muted">
           ยื่นเมื่อ {timeAgo(request.createdAt)} · ผู้โพสต์ {request.pet.ownerName}
@@ -293,7 +299,10 @@ function RequestRow({ request }: { request: AdoptionRequest }) {
         </p>
         <p className="text-sm text-muted line-clamp-2 whitespace-pre-line">“{request.message}”</p>
       </div>
-      {request.status === "PENDING" && (
+      {(handoverEnabled || request.legacyReview) && request.stage && request.stage !== "PENDING" && (
+        <div className="basis-full"><HandoverPanel request={request} party="APPLICANT" /></div>
+      )}
+      {canCancel(request, handoverEnabled) && (
         <button
           type="button"
           onClick={handleCancel}
@@ -304,5 +313,40 @@ function RequestRow({ request }: { request: AdoptionRequest }) {
         </button>
       )}
     </li>
+  );
+}
+
+// แจ้งเตือนในเว็บ: ล่าสุดก่อน · ยังไม่อ่านเป็นตัวหนา · กดแล้วอ่านแล้ว + ไปหน้าที่เกี่ยวข้อง (ไม่มีอีเมล/SMS)
+function Notifications() {
+  const { data, isLoading, isError, error, refetch } = useNotifications();
+  const markRead = useMarkNotificationRead();
+  const markAll = useMarkAllNotificationsRead();
+  if (isLoading) return <div aria-hidden="true" className="h-40 rounded-2xl bg-white border border-line animate-pulse" />;
+  if (isError) return <ErrorBox message={error?.message} onRetry={() => refetch()} />;
+  if (!data?.items.length) return <p className="bg-white rounded-2xl border border-line p-6 text-muted">ยังไม่มีการแจ้งเตือน</p>;
+  return (
+    <section className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="text-muted" role="status">ยังไม่อ่าน {data.unread} รายการ</p>
+        {data.unread > 0 && (
+          <button type="button" disabled={markAll.isPending} onClick={() => markAll.mutate()} className="ml-auto min-h-11 px-4 rounded-xl border border-line font-semibold hover:border-navy disabled:opacity-50">
+            อ่านทั้งหมดแล้ว
+          </button>
+        )}
+      </div>
+      <ul className="flex flex-col gap-2">
+        {data.items.map((n) => (
+          <li key={n.id}>
+            <Link to={n.link} onClick={() => !n.read && markRead.mutate(n.id)}
+              className={`flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border p-4 min-h-11 hover:border-navy ${n.read ? "bg-white border-line" : "bg-navy-soft border-navy/30"}`}>
+              {!n.read && <span aria-hidden="true" className="size-2.5 rounded-full bg-navy shrink-0" />}
+              <span className={n.read ? "font-medium" : "font-semibold"}>{n.title}</span>
+              {n.message && <span className="text-muted">· {n.message}</span>}
+              <span className="ml-auto text-sm text-muted">{timeAgo(n.createdAt)}{!n.read && <span className="sr-only"> · ยังไม่อ่าน</span>}</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

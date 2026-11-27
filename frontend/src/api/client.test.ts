@@ -30,7 +30,6 @@ vi.stubGlobal("window", Object.assign(win, { localStorage: localStorageFake }));
 vi.stubGlobal("localStorage", localStorageFake);
 vi.stubGlobal("navigator", { locks });
 vi.stubEnv("VITE_API_URL", "http://api.test");
-vi.stubEnv("VITE_USE_MOCK", "false");
 
 // แต่ละแท็บ = โหลด module ใหม่ (store ในหน่วยความจำแยกกัน แต่ localStorage ร่วมกัน)
 async function openTab() {
