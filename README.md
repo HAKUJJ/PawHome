@@ -34,7 +34,7 @@ PawHome เป็นเว็บแอป Full-Stack (โปรเจกต์ F
 | ผู้ใช้งาน | ภาพรวมสมาชิก โพสต์ และประวัติคำขอ (อ่านอย่างเดียว · ไม่แสดงอีเมล/เบอร์โทร) |
 | ประชาสัมพันธ์ | สร้าง / แก้ไข / เผยแพร่ / จัดลำดับ / ลบประกาศฉบับร่าง |
 
-สิทธิ์ผู้ดูแลอ่านจากตาราง `admin_memberships` ทุก request · ผู้ดูแลคนแรกแต่งตั้งด้วยสคริปต์ `npm run admin:bootstrap` ([ขั้นตอน](docs/admin-super-admin-bootstrap.md)) · ไม่มี API ให้แต่งตั้งตัวเอง
+สิทธิ์ผู้ดูแลอ่านจากตาราง `admin_memberships` ทุก request · ผู้ดูแลคนแรกแต่งตั้งด้วยสคริปต์ `npm run admin:bootstrap` (ขั้นตอน) · ไม่มี API ให้แต่งตั้งตัวเอง
 
 ### Planned
 
@@ -82,7 +82,9 @@ PawHome/
 └─ docs/            เอกสาร Admin + Deploy
 ```
 
-รายละเอียดแต่ละส่วน: [frontend/README.md](frontend/README.md) · [backend/README.md](backend/README.md) · [Deployment Checklist](docs/admin-deployment-checklist.md)
+> `database/` และ `docs/` เก็บไว้ในเครื่องผู้พัฒนาเท่านั้น (ไม่อยู่ใน Git) · Vercel ไม่ได้ใช้สองโฟลเดอร์นี้
+
+รายละเอียดแต่ละส่วน: [frontend/README.md](frontend/README.md) · [backend/README.md](backend/README.md) · Deployment Checklist
 
 ## 🚀 Getting Started
 
@@ -104,7 +106,7 @@ npm run dev                 # http://localhost:5173
 
 ⚠️ ใช้ฐานข้อมูล Development แยกจาก Production เสมอ · `npm run dev` ต่อฐานข้อมูลตาม `DATABASE_URL` ใน `backend/.env`
 
-สาธิตบนเครื่องโดยไม่ต้องมี Supabase (Express จริง + PostgreSQL ในหน่วยความจำ + ชุดข้อมูลเล็ก · **ไม่ใช่ระบบจริง**): `cd backend && npm run dev:demo` — [database/seeds/minimal/README.md](database/seeds/minimal/README.md)
+สาธิตบนเครื่องโดยไม่ต้องมี Supabase (Express จริง + PostgreSQL ในหน่วยความจำ + ชุดข้อมูลเล็ก · **ไม่ใช่ระบบจริง**): `cd backend && npm run dev:demo` — database/seeds/minimal/README.md
 
 ## 🔐 Environment Variables
 
@@ -138,10 +140,10 @@ npm run dev                 # http://localhost:5173
 1. Supabase → SQL Editor → รัน `database/schema.sql` (รันซ้ำได้ · สร้างตารางหลัก, trigger, RLS, bucket `pet-images`)
 2. รัน migrations ตามลำดับ: `000_lock_prisma_migrations` → `001_admin_workflow` → `002_notifications_announcements` → `003_admin_workflow_contract`
    - ทุกไฟล์อยู่ใน `begin … commit` และมีไฟล์ `.rollback.sql`
-   - ฐานข้อมูลที่มีข้อมูลจริงแล้ว: ทำตาม [Deployment Checklist](docs/admin-deployment-checklist.md) (preflight → backup → restore test → apply + verify)
+   - ฐานข้อมูลที่มีข้อมูลจริงแล้ว: ทำตาม Deployment Checklist (preflight → backup → restore test → apply + verify)
    - `004_simplify_admin` (ลบตาราง `admin_audit_logs`, `user_suspensions` ที่โค้ดไม่ใช้แล้ว) **ไม่บังคับ** · Production ยังไม่ได้รัน
-3. แต่งตั้งผู้ดูแลคนแรก: [docs/admin-super-admin-bootstrap.md](docs/admin-super-admin-bootstrap.md)
-4. (Development/Test เท่านั้น) ชุดข้อมูลทดสอบ: [docs/mock-data-guide.md](docs/mock-data-guide.md) · มี guard ปฏิเสธฐานข้อมูลที่มีผู้ใช้จริง
+3. แต่งตั้งผู้ดูแลคนแรก: docs/admin-super-admin-bootstrap.md
+4. (Development/Test เท่านั้น) ชุดข้อมูลทดสอบ: docs/mock-data-guide.md · มี guard ปฏิเสธฐานข้อมูลที่มีผู้ใช้จริง
 
 ห้ามใช้ `prisma migrate` หรือ `prisma db push` · โครงสร้างจริงอยู่ที่ไฟล์ SQL (สร้าง RLS, trigger และ FK ไป `auth.users`)
 

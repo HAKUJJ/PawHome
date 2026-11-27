@@ -113,24 +113,7 @@ Desktop.ini
 
 # ---------- เอกสาร / SQL: เก็บเฉพาะไฟล์ที่ระบบต้องใช้ (ตรวจแล้วไม่มี secret หรือข้อมูลจริง) ส่วนที่เหลืออยู่ในเครื่อง ----------
 # ใช้ dir/* + !ไฟล์ (ignore ทั้งโฟลเดอร์ด้วย dir/ จะ un-ignore ไฟล์ข้างในไม่ได้)
-docs/*
-!docs/admin-architecture.md
-!docs/admin-ui-design.md
-!docs/admin-ui-implementation.md
-!docs/admin-backend-contract-proposal.md
-!docs/admin-fullstack-implementation.md
-!docs/admin-migration-plan.md
-!docs/admin-deployment-checklist.md
-!docs/admin-super-admin-bootstrap.md
-!docs/deploy-vercel.md
-!docs/mock-data-guide.md
-!docs/database-seed-report.md
-!docs/integration-test-report.md
-database/*
-!database/README.md
-!database/schema.sql
-!database/mock-data.sql
-!database/migrations/
-!database/verification/
-!database/seeds/
+# เอกสารและไฟล์ SQL เก็บในเครื่องเท่านั้น (ไม่อยู่ใน Git)
+docs/
+database/
 .claude/
